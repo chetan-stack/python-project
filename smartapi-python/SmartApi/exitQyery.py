@@ -49,22 +49,20 @@ def ExitOrder():
             pnl = a['pnl']
             # getaverage = LTP["data"]["averageprice"]
             # print(a)
-            print('check',a,"==",getopen,'check')
-
             #if p and l shows 200 loss than than exit
             if (int(float(pnl)) <= -200) and (a["tradingsymbol"] not in traded_list):
                 print('start programe')
                 traded_list.append(a["tradingsymbol"])
                 transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
-                place_order(a["tradingsymbol"], a["symboltoken"], transactionType, a["exchange"], a["producttype"],
-                                    abs(int(a["netqty"])))
+                # place_order(a["tradingsymbol"], a["symboltoken"], transactionType, a["exchange"], a["producttype"],
+                #                     abs(int(a["netqty"])))
 
-            # if (int(float(pnl)) <= 400) and (a["tradingsymbol"] not in traded_list):
-            #     print('start programe')
-            #     traded_list.append(a["tradingsymbol"])
-            #     transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
-            #     place_order(a["tradingsymbol"], a["symboltoken"], transactionType, a["exchange"], a["producttype"],
-            #                         abs(int(a["netqty"])))
+            if (int(float(pnl)) >= 500) and (a["tradingsymbol"] not in traded_list):
+                print('start programe')
+                traded_list.append(a["tradingsymbol"])
+                transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
+                # place_order(a["tradingsymbol"], a["symboltoken"], transactionType, a["exchange"], a["producttype"],
+                #                     abs(int(a["netqty"])))
             time.sleep(2)
 
 

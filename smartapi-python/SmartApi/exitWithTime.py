@@ -38,7 +38,7 @@ def place_order(symbol, token, transactiontype, exchange, producttype, qty):
     place = obj.placeOrder(orderparams)
     print(place)
 
-def ExitOrder():
+def ExitAllOrder():
         for a in getposition['data']:
             traded_list.append(a["tradingsymbol"])
             transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
@@ -58,6 +58,6 @@ while timenow < orderplacetime:
 print("Ready for Trading , CURRENT TIME:{}".format(datetime.datetime.now()))
 
 try:
-    ExitOrder()
+    ExitAllOrder()
 except Exception as e:
     raise e

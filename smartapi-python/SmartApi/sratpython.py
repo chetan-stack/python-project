@@ -1,8 +1,12 @@
+import asyncio
+
 from smartapi import SmartConnect
 import time
 from datetime import datetime
 import datetime
 import pyotp
+
+
 api_key = "pMZtYR5S"
 user_id = "c182721"
 password = "Csethi@4321"
@@ -114,11 +118,12 @@ f_only = {
 
 exchange = "NSE"
 traded_list = []
-invest_per_trade = 10000
-
+invest_per_trade = 1000
+count = 0
 
 def GettingLtpData():
-    while True:
+    global count
+    while count < 2:
         for symbol, token in f_only.items():
             LTP = obj.ltpData(exchange, symbol, token)
             # print(LTP)
@@ -126,30 +131,33 @@ def GettingLtpData():
             low = LTP["data"]["low"]
             ltp = LTP["data"]["ltp"]
             quantity = int(invest_per_trade * 10 / ltp)
+
             # print(f"Scirpt:{symbol}, High:{high}, Low:{low}, LTP:{ltp}")
 
             if (high == ltp) and (symbol not in traded_list):
                 traded_list.append(symbol)
+                count = count + 1
                 orderparams1 = {"variety": "NORMAL", "tradingsymbol": symbol, "symboltoken": token,
                                 "transactiontype": "BUY", "exchange": exchange, "ordertype": "LIMIT",
                                 "producttype": "INTRADAY", "duration": "DAY", "price": ltp, "squareoff": "0",
                                 "stoploss": "0", "quantity": quantity}
-                orderId1=obj.placeOrder(orderparams1)
-                print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId1} quantity :{quantity} "  )
-                # print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} "  )
+                # orderId1=obj.placeOrder(orderparams1)
+                # print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId1} quantity :{quantity} "  )
+                print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} "  )
 
             if (low == ltp) and (symbol not in traded_list):
                 traded_list.append(symbol)
+                count = count + 1
                 orderparams2 = {"variety": "NORMAL", "tradingsymbol": symbol, "symboltoken": token,
                                 "transactiontype": "SELL", "exchange": exchange, "ordertype": "LIMIT",
                                 "producttype": "INTRADAY", "duration": "DAY", "price": ltp, "squareoff": "0",
                                 "stoploss": "0", "quantity": quantity}
-                orderId2=obj.placeOrder(orderparams2)
-                print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId2} quantity :{quantity} ")
-                # print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} ")
+                # orderId2=obj.placeOrder(orderparams2)
+                # print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId2} quantity :{quantity} ")
+                print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} ")
 
 
-orderplacetime = int(9) * 60 + int(17)
+orderplacetime = int(9) * 60 + int(20)
 timenow = (datetime.datetime.now().hour * 60 + datetime.datetime.now().minute)
 print("Waiting for 9.20 AM , CURRENT TIME:{}".format(datetime.datetime.now()))
 
@@ -159,6 +167,8 @@ while timenow < orderplacetime:
 print("Ready for Trading , CURRENT TIME:{}".format(datetime.datetime.now()))
 
 try:
+    # asyncio.run(GettingLtpData())
     GettingLtpData()
 except Exception as e:
     raise e
+
