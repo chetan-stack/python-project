@@ -15,7 +15,7 @@ import requests
 
 import document
 
-current_date_time = datetime.datetime.now() - timedelta(days = 6)
+current_date_time = datetime.datetime.now()
 form_date = current_date_time - timedelta(days = 10)
 traded_list_exit = []
 print("current tym",current_date_time)
@@ -31,9 +31,6 @@ script_list = {
     'INFY-EQ': '1594',
     "ITC-EQ": "1660",
     "WIPRO-EQ": "3787",
-    'RELIANCE-EQ': '2885',
-    'TCS-EQ': '11536',
-
 };
 
 buy_traded_stock = []
@@ -100,15 +97,15 @@ def GettingLtpData(script, token, order):
         "quantity": quantity
     }
 
-    # if placeOREDR:
-    orderId = obj.placeOrder(orderparams)
-    print(
-            f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
-        )
+    if placeOREDR:
+        # orderId = obj.placeOrder(orderparams)
+        # print(
+        #     f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
+        # )
 
 
-    bot_message = f'order status:{order} for {script} with price {ltp:.1f} and the time is {datetime.datetime.now()}'
-    sendAlert(bot_message)
+        bot_message = f'order status:{order} for {script} with price {ltp:.1f} and the time is {datetime.datetime.now()}'
+        sendAlert(bot_message)
 
 
 
@@ -167,6 +164,8 @@ def strategy():
         jwtToken = token['data']["jwtToken"]
         refreshToken = token['data']['refreshToken']
         feedToken = token['data']['feedToken']
+        LTP = obj.ltpData('NSE', 'NIFTY', '26000')
+        print(LTP)
         for script, token in script_list.items():
             historicParam = {
                 "exchange": exchange,
@@ -177,8 +176,8 @@ def strategy():
             }
             hist_data = obj.getCandleData(historicParam)["data"]
             LTP = obj.ltpData(exchange, script, token)
-            # print(LTP)
-            # print("__________hist",hist_data)
+
+            # print(hist_data)
             if hist_data != None:
                 df = pd.DataFrame(
                     hist_data,
@@ -210,31 +209,18 @@ def strategy():
                     # 3 close
                     sup_pre3 = df.sup.values[-3]
                     close_pre3 = df.close.values[-3]
-
+                    emaClose = df['ema'].values[-1]
+                    closebar = df['close'].values[-1]
+                    supertrend = df['stx'].values[-1]
                     if not df.empty:
-                        if close_pre >= sup_pre and close_cl < sup_cl and (script not in sell_traded_stock):
-                            sell_traded_stock.append(script)
-                            print(script, token, "SELL")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "SELL")
-
-                            # getposition = obj.position()
-                            # print("Holding______",getposition.data)
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "SELL")
-
-                        if close_pre <= sup_pre and close_cl > sup_cl and (script not in buy_traded_stock):
+                       # print(df)
+                       if emaClose <= closebar and supertrend == 'up' and (script not in buy_traded_stock):
                             buy_traded_stock.append(script)
-                            print(script, token, "BUY")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" ++ str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
                             GettingLtpData(script, token, "BUY")
-                            # getposition = obj.position()
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "BUY")
+
+                       if emaClose >= closebar and supertrend == 'up' and (script not in sell_traded_stock):
+                           sell_traded_stock.append(script)
+                           GettingLtpData(script, token, "SEll")
 
             time.sleep(1)
 
@@ -242,7 +228,7 @@ def strategy():
         print("Historic Api failed: {}".format(e),format(datetime.datetime.now()))
         bot_message = f"Historic Api failed {e}"
         sendAlert(bot_message)
-        strategy()
+        # strategy()
 
     try:
         logout = obj.terminateSession(user_id)

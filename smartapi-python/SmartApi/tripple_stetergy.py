@@ -11,8 +11,6 @@ import pyotp
 import schedule
 import math
 import requests
-
-
 import document
 
 current_date_time = datetime.datetime.now() - timedelta(days = 6)
@@ -101,10 +99,10 @@ def GettingLtpData(script, token, order):
     }
 
     # if placeOREDR:
-    orderId = obj.placeOrder(orderparams)
-    print(
-            f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
-        )
+    # orderId = obj.placeOrder(orderparams)
+    # print(
+    #         f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
+    #     )
 
 
     bot_message = f'order status:{order} for {script} with price {ltp:.1f} and the time is {datetime.datetime.now()}'
@@ -177,6 +175,9 @@ def strategy():
             }
             hist_data = obj.getCandleData(historicParam)["data"]
             LTP = obj.ltpData(exchange, script, token)
+            high = LTP["data"]["high"]
+            low = LTP["data"]["low"]
+            ltp = LTP["data"]["ltp"]
             # print(LTP)
             # print("__________hist",hist_data)
             if hist_data != None:
@@ -185,9 +186,10 @@ def strategy():
                     columns=['date', 'open', 'high', 'low', 'close', 'volume'])
                 df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
                 # df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
-                df["ema"] = ta.ema(df["close"], length=200)
-
-                df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'up', 'down'), np.NaN)
+                df["ema_200"] = ta.ema(df["close"], length=200)
+                df["ema_100"] = ta.ema(df["close"], length=100)
+                df["ema_50"] = ta.ema(df["close"], length=50)
+                df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'green', 'red'), np.NaN)
 
                 # df['stx'] = 'down' if df['sup'].values > df['close'].values else 'up'
 
@@ -211,30 +213,33 @@ def strategy():
                     sup_pre3 = df.sup.values[-3]
                     close_pre3 = df.close.values[-3]
 
+                    # used keys
+                    stx = df['stx'].values[-1]
+                    ema50 = df['ema_50'].values[-1]
+                    ema100 = df['ema_100'].values[-1]
+                    ema200 = df['ema_200'].values[-1]
+                    can_close = df['close'].values[-1]
+                    # print(stx,ema50,ema100,ema200,can_close,"-------------")
+
                     if not df.empty:
-                        if close_pre >= sup_pre and close_cl < sup_cl and (script not in sell_traded_stock):
-                            sell_traded_stock.append(script)
-                            print(script, token, "SELL")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "SELL")
 
-                            # getposition = obj.position()
-                            # print("Holding______",getposition.data)
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "SELL")
-
-                        if close_pre <= sup_pre and close_cl > sup_cl and (script not in buy_traded_stock):
+                        if high == ltp and stx == 'green' and ema50 < can_close and ema100 < can_close and ema200 < can_close and(script not in buy_traded_stock):
                             buy_traded_stock.append(script)
                             print(script, token, "BUY")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" ++ str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
+                            # f = open("storeStock.txt", "a")
+                            # f.write(str(script) + "----" + + str(token) + "---------BUY-----------" + "----" + str(
+                            #     LTP['data']['ltp']) + str(current_date_time) + '\n')
+                            # f.close()
                             GettingLtpData(script, token, "BUY")
-                            # getposition = obj.position()
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "BUY")
+
+                        if low == ltp and stx == 'red' and ema50 > can_close and ema100 > can_close and ema200 > can_close and(script not in buy_traded_stock):
+                            sell_traded_stock.append(script)
+                            print(script, token, "BUY")
+                            # f = open("storeStock.txt", "a")
+                            # f.write(str(script) + "----" + + str(token) + "---------BUY-----------" + "----" + str(
+                            #     LTP['data']['ltp']) + str(current_date_time) + '\n')
+                            # f.close()
+                            GettingLtpData(script, token, "SELL")
 
             time.sleep(1)
 

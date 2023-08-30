@@ -1,25 +1,24 @@
-import asyncio
-
+import schedule
 from smartapi import SmartConnect
 import time
 from datetime import datetime
 import datetime
 import pyotp
+import document
 
-
-api_key = "pMZtYR5S"
-user_id = "c182721"
-password = "Csethi@4321"
-totp = pyotp.TOTP("ELAC7LJCYC6ENWQBWNEGRGV66U").now()
-print(totp)
+api_key = document.api_key
+user_id = document.user_id
+password = document.password
+totp = pyotp.TOTP(document.totp).now()
+# print(totp)
 obj = SmartConnect(api_key=api_key)
 obj2 = obj.generateSession(user_id, password,totp)
-print(obj2)
+# print(obj2)
 
-token = obj.generateToken(obj.generateSession(user_id, password, totp)["data"]["refreshToken"])
-jwtToken = token['data']["jwtToken"]
-refreshToken = token['data']['refreshToken']
-feedToken = token['data']['feedToken']
+# token = obj.generateToken(obj.generateSession(user_id, password, totp)["data"]["refreshToken"])
+# jwtToken = token['data']["jwtToken"]
+# refreshToken = token['data']['refreshToken']
+# feedToken = token['data']['feedToken']
 # print(obj2)
 # f_only = {"MARUTI-EQ": "10999", "LALPATHLAB-EQ": "11654", "IDFCFIRSTB-EQ": "11184", "CONCOR-EQ": "4749",
 #           "PEL-EQ": "2412", "MUTHOOTFIN-EQ": "23650", "ESCORTS-EQ": "958", "PIDILITIND-EQ": "2664",
@@ -116,59 +115,139 @@ f_only = {
     'WIPRO-EQ': '3787',
   };
 
-exchange = "NSE"
+exchange = "NFO"
 traded_list = []
+traded_list_filter = []
+traded_list_exit = []
 invest_per_trade = 1000
-count = 0
+count = 1
+countExit = 0
 
 def GettingLtpData():
+    print('start trade')
     global count
     while count < 2:
-        for symbol, token in f_only.items():
-            LTP = obj.ltpData(exchange, symbol, token)
-            # print(LTP)
-            high = LTP["data"]["high"]
-            low = LTP["data"]["low"]
-            ltp = LTP["data"]["ltp"]
-            quantity = int(invest_per_trade * 10 / ltp)
+        try:
+            for symbol, token in f_only.items():
+                LTP = obj.ltpData(exchange, symbol, token)
+                print(LTP)
+                high = LTP["data"]["high"]
+                low = LTP["data"]["low"]
+                ltp = LTP["data"]["ltp"]
+                # quantity = int(invest_per_trade * 10 / ltp)
+                quantity = 1
+                # print(f"Scirpt:{symbol}, High:{high}, Low:{low}, LTP:{ltp}")
 
-            # print(f"Scirpt:{symbol}, High:{high}, Low:{low}, LTP:{ltp}")
+                if (high == ltp) and (symbol not in traded_list):
+                    traded_list.append(symbol)
+                    count = count + 1
+                    orderparams1 = {"variety": "NORMAL", "tradingsymbol": symbol, "symboltoken": token,
+                                    "transactiontype": "BUY", "exchange": exchange, "ordertype": "LIMIT",
+                                    "producttype": "INTRADAY", "duration": "DAY", "price": ltp, "squareoff": "0",
+                                    "stoploss": "0", "quantity": quantity}
+                    orderId1=obj.placeOrder(orderparams1)
+                    # print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId1} quantity :{quantity} "  )
+                    print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} ")
 
-            if (high == ltp) and (symbol not in traded_list):
-                traded_list.append(symbol)
-                count = count + 1
-                orderparams1 = {"variety": "NORMAL", "tradingsymbol": symbol, "symboltoken": token,
-                                "transactiontype": "BUY", "exchange": exchange, "ordertype": "LIMIT",
-                                "producttype": "INTRADAY", "duration": "DAY", "price": ltp, "squareoff": "0",
-                                "stoploss": "0", "quantity": quantity}
-                # orderId1=obj.placeOrder(orderparams1)
-                # print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId1} quantity :{quantity} "  )
-                print(f"Buy order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} "  )
+                if (low == ltp) and (symbol not in traded_list):
+                    traded_list.append(symbol)
+                    count = count + 1
+                    orderparams2 = {"variety": "NORMAL", "tradingsymbol": symbol, "symboltoken": token,
+                                    "transactiontype": "SELL", "exchange": exchange, "ordertype": "LIMIT",
+                                    "producttype": "INTRADAY", "duration": "DAY", "price": ltp, "squareoff": "0",
+                                    "stoploss": "0", "quantity": quantity}
+                    orderId2=obj.placeOrder(orderparams2)
+                    # print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId2} quantity :{quantity} ")
+                    print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} ")
+        except Exception as e:
+            print("error: {}".format(e))
 
-            if (low == ltp) and (symbol not in traded_list):
-                traded_list.append(symbol)
-                count = count + 1
-                orderparams2 = {"variety": "NORMAL", "tradingsymbol": symbol, "symboltoken": token,
-                                "transactiontype": "SELL", "exchange": exchange, "ordertype": "LIMIT",
-                                "producttype": "INTRADAY", "duration": "DAY", "price": ltp, "squareoff": "0",
-                                "stoploss": "0", "quantity": quantity}
-                # orderId2=obj.placeOrder(orderparams2)
-                # print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id {orderId2} quantity :{quantity} ")
-                print(f"Sell order Place for {symbol} at : {datetime.datetime.now()} with Order id {ltp} order id quantity :{quantity} ")
+def filterProfit():
+    global countExit
+    print('start filter')
+    getposition = obj.position()
+    length_pos = len(getposition['data'])
+    countExit = length_pos
+
+    while countExit > 0 and timenow < int(9) * 60 + int(25):
+        try:
+            for a in getposition['data']:
+                LTP = obj.ltpData(a["exchange"], a["tradingsymbol"], a["symboltoken"])
+                getprice = a["avgnetprice"]
+                getltp = LTP["data"]["ltp"]
+                getopen = LTP["data"]["open"]
+                getClose = LTP["data"]["close"]
+                pnl = a['pnl']
+
+                if (int(float(pnl)) < -200) and (a["tradingsymbol"] not in traded_list_filter):
+                    print(a["tradingsymbol"])
+                    traded_list_filter.append(a["tradingsymbol"])
+                    transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
+                    sellOrderExit = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"],
+                                    "symboltoken": a["symboltoken"],
+                                    "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
+                                    "producttype": a["producttype"], "duration": "DAY", "price": getltp,
+                                    "squareoff": "0","stoploss": "0", "quantity": abs(int(a["netqty"]))}
+                    orderSell = obj.placeOrder(sellOrderExit)
+                    countExit = countExit - 1
+                    print(f"{transactionType} order Place for {a['symboltoken']} at : {getltp} with Order id {orderSell} order id quantity :{a['netqty']} ")
+
+            if (int(float(pnl)) > 500) and (a["tradingsymbol"] not in traded_list_filter):
+
+                    traded_list_filter.append(a["tradingsymbol"])
+                    transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
+
+                    buyOrderExit = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"],
+                                    "symboltoken": a["symboltoken"],
+                                    "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
+                                    "producttype": a["producttype"], "duration": "DAY", "price": getltp,
+                                    "squareoff": "0","stoploss": "0", "quantity": abs(int(a["netqty"]))}
+                    orderBuy = obj.placeOrder(buyOrderExit)
+                    countExit = countExit - 1
+                    print(f"{transactionType} order Place for {a['symboltoken']} at : {getltp} with Order id {orderBuy} order id quantity :{a['netqty']} ")
+
+        except Exception as e:
+            print("error: {}".format(e))
+
+    print('finish filtering stock')
+
+
+def exitQuert():
+    # countExit = 0
+    # print('start exit',"exit-count = ",countExit)
+    getposition = obj.position()
+    try:
+        for a in getposition['data']:
+            LTP = obj.ltpData(a["exchange"], a["tradingsymbol"], a["symboltoken"])
+            getltp = LTP["data"]["ltp"]
+
+            if (a["tradingsymbol"] not in traded_list_exit):
+
+                traded_list_exit.append(a["tradingsymbol"])
+                transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
+
+                orderparams3 = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"], "symboltoken": a["symboltoken"],
+                                "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
+                                "producttype": a["producttype"], "duration": "DAY", "price": getltp, "squareoff": "0",
+                                "stoploss": "0", "quantity": abs(int(a["netqty"]))}
+                orderId3=obj.placeOrder(orderparams3)
+                print(f"{orderparams3} order Place for {a['symboltoken']} at : {datetime.datetime.now()} with Order id {orderId3} order id quantity :{a['netqty']} ")
+
+                time.sleep(2)
+
+    except Exception as e:
+        print("error: {}".format(e))
 
 
 orderplacetime = int(9) * 60 + int(20)
 timenow = (datetime.datetime.now().hour * 60 + datetime.datetime.now().minute)
 print("Waiting for 9.20 AM , CURRENT TIME:{}".format(datetime.datetime.now()))
 
-while timenow < orderplacetime:
-    time.sleep(0.2)
-    timenow = (datetime.datetime.now().hour * 60 + datetime.datetime.now().minute)
-print("Ready for Trading , CURRENT TIME:{}".format(datetime.datetime.now()))
+schedule.every().day.at("09:20").do(GettingLtpData)
+schedule.every().day.at("09:22").do(filterProfit)
+schedule.every().day.at("09:25").do(exitQuert)
 
-try:
-    # asyncio.run(GettingLtpData())
-    GettingLtpData()
-except Exception as e:
-    raise e
+while True:
+    schedule.run_pending()
+    time.sleep(2)
 

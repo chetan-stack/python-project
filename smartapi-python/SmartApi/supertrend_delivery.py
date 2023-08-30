@@ -15,7 +15,7 @@ import requests
 
 import document
 
-current_date_time = datetime.datetime.now() - timedelta(days = 6)
+current_date_time = datetime.datetime.now()
 form_date = current_date_time - timedelta(days = 10)
 traded_list_exit = []
 print("current tym",current_date_time)
@@ -31,9 +31,6 @@ script_list = {
     'INFY-EQ': '1594',
     "ITC-EQ": "1660",
     "WIPRO-EQ": "3787",
-    'RELIANCE-EQ': '2885',
-    'TCS-EQ': '11536',
-
 };
 
 buy_traded_stock = []
@@ -44,22 +41,6 @@ per_trade_fund = 10000
 ma_short = 13
 ma_long = 22
 runcount = 0
-
-
-def PlaceOredrExit():
-    placeOREDR = False
-
-def checkorderlimit():
-    try:
-        getposition = obj.position()
-        if getposition['data'].len >= 3:
-           placeOREDR = False
-
-
-    except Exception as e:
-        print("error in check number in Position: {}".format(e))
-        sendAlert("error in check number in Position: {}".format(e))
-
 
 
 def sendAlert(bot_message):
@@ -76,6 +57,19 @@ def sendAlert(bot_message):
 
     print(response)
     return response.json()
+
+def PlaceOredrExit():
+    placeOREDR = False
+
+def checkorderlimit():
+    try:
+        getposition = obj.position()
+        if getposition['data'].len >= 3:
+           placeOREDR = False
+
+
+    except Exception as e:
+        print("error in check number in Position: {}".format(e))
 
 
 def GettingLtpData(script, token, order):
@@ -100,17 +94,20 @@ def GettingLtpData(script, token, order):
         "quantity": quantity
     }
 
-    # if placeOREDR:
-    orderId = obj.placeOrder(orderparams)
-    print(
-            f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
-        )
+    if placeOREDR:
+        # orderId = obj.placeOrder(orderparams)
+        # print(
+        #     f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
+        # )
+        bot_message = f"{order} trend for {script} swing trade with price {ltp}"
+        bot_token = "5707293106:AAEPkxexnIdoUxF5r7hpCRS_6CHINgU4HTw"
+        bot_chatid = "2027669179"
+        send_message = "https://api.telegram.org/bot" + bot_token + "/sendMessage?chat_id=" + bot_chatid + \
+                       "&parse_mode=MarkdownV2&text=" + bot_message
 
-
-    bot_message = f'order status:{order} for {script} with price {ltp:.1f} and the time is {datetime.datetime.now()}'
-    sendAlert(bot_message)
-
-
+        response = requests.get(send_message)
+        print(response)
+        return response.json()
 
 def exitQuert():
     api_key = document.api_key
@@ -143,8 +140,6 @@ def exitQuert():
 
     except Exception as e:
         print("error: {}".format(e))
-        bot_message = f"error when exit {e}"
-        sendAlert(bot_message)
 
 def strategy():
     print('check stetergy')
@@ -171,22 +166,19 @@ def strategy():
             historicParam = {
                 "exchange": exchange,
                 "symboltoken": token,
-                "interval": "FIVE_MINUTE",
+                "interval": "FIFTEEN_MINUTE",
                 "fromdate": form_date.strftime("%Y-%m-%d 09:15"),
                 "todate": current_date_time.strftime("%Y-%m-%d %H:%M")
             }
             hist_data = obj.getCandleData(historicParam)["data"]
             LTP = obj.ltpData(exchange, script, token)
-            # print(LTP)
-            # print("__________hist",hist_data)
+
+            # print(hist_data)
             if hist_data != None:
                 df = pd.DataFrame(
                     hist_data,
                     columns=['date', 'open', 'high', 'low', 'close', 'volume'])
                 df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
-                # df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
-                df["ema"] = ta.ema(df["close"], length=200)
-
                 df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'up', 'down'), np.NaN)
 
                 # df['stx'] = 'down' if df['sup'].values > df['close'].values else 'up'
@@ -194,7 +186,6 @@ def strategy():
                 df.dropna(inplace=True)
                 # print(df.tail(40))
                 print('#------------------------------' ,script,df.close.values[-5],df.close.values[-4],df.close.values[-3],df.close.values[-2],"----",df.sup.values[-1],'-----------------------#',format(datetime.datetime.now()))
-
                 sup_cl = df.stx.values[-1]
                 sup_pre = df.stx.values[-2]
 
@@ -219,7 +210,6 @@ def strategy():
                             f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
                             f.close()
                             GettingLtpData(script, token, "SELL")
-
                             # getposition = obj.position()
                             # print("Holding______",getposition.data)
                             # if script in getposition['data']['tradingsymbol']:
@@ -229,7 +219,7 @@ def strategy():
                             buy_traded_stock.append(script)
                             print(script, token, "BUY")
                             f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" ++ str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
+                            f.write(str(script) + "----" + str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
                             f.close()
                             GettingLtpData(script, token, "BUY")
                             # getposition = obj.position()
@@ -240,22 +230,16 @@ def strategy():
 
     except Exception as e:
         print("Historic Api failed: {}".format(e),format(datetime.datetime.now()))
-        bot_message = f"Historic Api failed {e}"
-        sendAlert(bot_message)
-        strategy()
-
     try:
         logout = obj.terminateSession(user_id)
         print("Logout Successfull")
     except Exception as e:
         print("Logout failed: {}".format(e))
-        bot_message = f"Logout failed {e}"
-        sendAlert(bot_message)
 
 
 strategy()
-schedule.every(1).minutes.do(strategy)
-# schedule.every(5).minutes.do(checkorderlimit)
+schedule.every(5).minutes.do(strategy)
+schedule.every(10).minutes.do(checkorderlimit)
 schedule.every().day.at("15:05").do(exitQuert)
 schedule.every().day.at("15:00").do(PlaceOredrExit)
 

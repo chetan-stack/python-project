@@ -32,8 +32,6 @@ script_list = {
     "ITC-EQ": "1660",
     "WIPRO-EQ": "3787",
     'RELIANCE-EQ': '2885',
-    'TCS-EQ': '11536',
-
 };
 
 buy_traded_stock = []
@@ -100,15 +98,15 @@ def GettingLtpData(script, token, order):
         "quantity": quantity
     }
 
-    # if placeOREDR:
-    orderId = obj.placeOrder(orderparams)
-    print(
-            f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
-        )
+    if placeOREDR:
+        # orderId = obj.placeOrder(orderparams)
+        # print(
+        #     f"{order} order Place for {script} at : {datetime.datetime.now()} with Order id {orderId}"
+        # )
 
 
-    bot_message = f'order status:{order} for {script} with price {ltp:.1f} and the time is {datetime.datetime.now()}'
-    sendAlert(bot_message)
+        bot_message = f'order status:{order} for {script} with price {ltp:.1f} and the time is {datetime.datetime.now()}'
+        sendAlert(bot_message)
 
 
 
@@ -177,71 +175,26 @@ def strategy():
             }
             hist_data = obj.getCandleData(historicParam)["data"]
             LTP = obj.ltpData(exchange, script, token)
-            # print(LTP)
-            # print("__________hist",hist_data)
-            if hist_data != None:
-                df = pd.DataFrame(
-                    hist_data,
-                    columns=['date', 'open', 'high', 'low', 'close', 'volume'])
-                df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
-                # df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
-                df["ema"] = ta.ema(df["close"], length=200)
+            print(LTP)
 
-                df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'up', 'down'), np.NaN)
+            pct_change = {}
+            pct_change['open'] = LTP['data']['open']
+            pct_change['high'] = LTP['data']['high']
+            pct_change['low'] = LTP['data']['low']
+            pct_change['close'] = LTP['data']['close']
 
-                # df['stx'] = 'down' if df['sup'].values > df['close'].values else 'up'
+            pct_change['change'] = (pct_change['open'] - pct_change['close']) / pct_change['close'] * 100
 
-                df.dropna(inplace=True)
-                # print(df.tail(40))
-                print('#------------------------------' ,script,df.close.values[-5],df.close.values[-4],df.close.values[-3],df.close.values[-2],"----",df.sup.values[-1],'-----------------------#',format(datetime.datetime.now()))
-
-                sup_cl = df.stx.values[-1]
-                sup_pre = df.stx.values[-2]
-
-
-                if not df.empty:
-
-                    sup_cl = df.sup.values[-1]
-                    close_cl = df.close.values[-1]
-                    # pre close
-                    sup_pre = df.sup.values[-2]
-                    close_pre = df.close.values[-2]
-
-                    # 3 close
-                    sup_pre3 = df.sup.values[-3]
-                    close_pre3 = df.close.values[-3]
-
-                    if not df.empty:
-                        if close_pre >= sup_pre and close_cl < sup_cl and (script not in sell_traded_stock):
-                            sell_traded_stock.append(script)
-                            print(script, token, "SELL")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "SELL")
-
-                            # getposition = obj.position()
-                            # print("Holding______",getposition.data)
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "SELL")
-
-                        if close_pre <= sup_pre and close_cl > sup_cl and (script not in buy_traded_stock):
-                            buy_traded_stock.append(script)
-                            print(script, token, "BUY")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" ++ str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "BUY")
-                            # getposition = obj.position()
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "BUY")
-
+            # print(pct_change)
+            sorted_stocks = sorted(pct_change.items(), key=lambda x: x[1], reverse=True)
+            for stock in sorted_stocks:
+                print(stock[0], ':', round(stock[1], 2), '%')
             time.sleep(1)
 
     except Exception as e:
         print("Historic Api failed: {}".format(e),format(datetime.datetime.now()))
         bot_message = f"Historic Api failed {e}"
-        sendAlert(bot_message)
+        # sendAlert(bot_message)
         strategy()
 
     try:
