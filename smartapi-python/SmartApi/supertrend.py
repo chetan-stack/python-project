@@ -12,7 +12,6 @@ import schedule
 import math
 import requests
 
-
 import document
 
 current_date_time = datetime.datetime.now() - timedelta(days = 6)

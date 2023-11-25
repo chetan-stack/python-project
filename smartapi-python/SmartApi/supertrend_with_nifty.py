@@ -35,7 +35,6 @@ script_list = {
     'TCS-EQ': '11536',
 
 };
-
 buy_traded_stock = []
 sell_traded_stock = []
 
@@ -46,8 +45,17 @@ ma_long = 22
 runcount = 0
 
 
+
 def PlaceOredrExit():
     placeOREDR = False
+
+def getorderBook():
+    OrderBook = obj.position()
+    print(OrderBook)
+    if OrderBook.data.length == 0:
+        return True
+    else:
+        return False
 
 def checkorderlimit():
     try:
@@ -103,7 +111,7 @@ def GettingLtpData(script, token, order):
     #     )
 
 
-    bot_message = f'order status:{order} for {script} with price and the time is {datetime.datetime.now()}'
+    bot_message = f'order status:{order} for {script} with price {token} and the time is {datetime.datetime.now()}'
     sendAlert(bot_message)
 
 
@@ -155,14 +163,13 @@ def strategy():
     totp = pyotp.TOTP(document.totp).now()
 
 
-
     try:
-        obj = SmartConnect(api_key=api_key)
-        token = obj.generateToken(obj.generateSession(user_id, password, totp)["data"]["refreshToken"])
-        jwtToken = token['data']["jwtToken"]
-        refreshToken = token['data']['refreshToken']
-        feedToken = token['data']['feedToken']
-        print(obj)
+        # obj = SmartConnect(api_key=api_key)
+        # token = obj.generateToken(obj.generateSession(user_id, password, totp)["data"]["refreshToken"])
+        # jwtToken = token['data']["jwtToken"]
+        # refreshToken = token['data']['refreshToken']
+        # feedToken = token['data']['feedToken']
+        # print(obj)
 
         tv = TvDatafeed()
         hist_data = tv.get_hist(symbol='NIFTY',exchange='NSE',interval=Interval.in_5_minute,n_bars=50)
@@ -189,34 +196,62 @@ def strategy():
                 sup_pre3 = df.sup.values[-3]
                 close_pre3 = df.close.values[-3]
 
+                # 4 close
+                sup_pre4 = df.sup.values[-4]
+                close_pre4 = df.close.values[-4]
+                print('order book',getorderBook())
                 if not df.empty:
-                    if close_pre >= sup_pre and close_cl < sup_cl:
-                        GettingLtpData('nifty', close_cl, "SELL")
+                    if getorderBook():  # (check if Nifty order is not placed)
+                        if close_pre >= sup_pre and close_cl < sup_cl:
+                            GettingLtpData('nifty', close_cl, "SELL")
+                        elif close_pre <= sup_pre and close_cl > sup_cl:
+                            GettingLtpData('nifty', close_cl, "BUY")
+                        elif close_pre4 <= sup_pre4 and close_pre3 <= sup_pre3 and close_pre <= sup_pre and close_cl < sup_cl:
+                            GettingLtpData('nifty', close_cl, "SELL")
+                        elif close_pre4 >= sup_pre4 and close_pre3 >= sup_pre3 and close_pre >= sup_pre and close_cl > sup_cl:
+                            GettingLtpData('nifty', close_cl, "BUY")
 
-                    if close_pre <= sup_pre and close_cl > sup_cl:
-                        GettingLtpData('nifty', close_cl, "BUY")
+                    else:  # (if Nifty order is placed, then run exit script with supertrend)
+                        if close_pre >= sup_pre and close_cl < sup_cl:
+                            GettingLtpData('nifty', close_cl, "SELL")   # (run exit script)
+                        elif close_pre <= sup_pre and close_cl > sup_cl:
+                            GettingLtpData('nifty', close_cl, "BUY")   # (run exit script)
 
             time.sleep(1)
 
 
 
     except Exception as e:
-        print("Historic Api failed: {}".format(e),format(datetime.datetime.now()))
+        print("Script Not Working: {}".format(e),format(datetime.datetime.now()))
         bot_message = f"Historic Api failed {e}"
         # sendAlert(bot_message)
         strategy()
 
-    try:
-        logout = obj.terminateSession(user_id)
-        print("Logout Successfull")
-    except Exception as e:
-        print("Logout failed: {}".format(e))
-        bot_message = f"Logout failed {e}"
-        # sendAlert(bot_message)
+    # try:
+    #     logout = obj.terminateSession(user_id)
+    #     print("Logout Successfull")
+    # except Exception as e:
+    #     print("Logout failed: {}".format(e))
+    #     bot_message = f"Logout failed {e}"
+    #     # sendAlert(bot_message)
+
+try:
+    api_key = document.api_key
+    user_id = document.user_id
+    password = document.password
+    totp = pyotp.TOTP(document.totp).now()
+
+    obj = SmartConnect(api_key=api_key)
+    token = obj.generateSession(user_id, password, totp)
+    print("--------",obj,token)
+    if obj:
+        strategy()
 
 
-strategy()
-schedule.every(1).minutes.do(strategy)
+except Exception as e:
+    print("Build Connection Error: {}".format(e), format(datetime.datetime.now()))
+
+schedule.every(2).minutes.do(strategy)
 # schedule.every(5).minutes.do(checkorderlimit)
 schedule.every().day.at("15:05").do(exitQuert)
 schedule.every().day.at("15:00").do(PlaceOredrExit)
@@ -231,3 +266,12 @@ while True:
             time.sleep(2)
         except Exception as e:
             raise e
+
+
+
+
+# important notes:
+# obj.tradeBook()
+# obj.orderBook()
+# obj.position()
+# obj.holding()
