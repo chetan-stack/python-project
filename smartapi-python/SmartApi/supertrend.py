@@ -166,6 +166,7 @@ def strategy():
         jwtToken = token['data']["jwtToken"]
         refreshToken = token['data']['refreshToken']
         feedToken = token['data']['feedToken']
+        print(token)
         for script, token in script_list.items():
             historicParam = {
                 "exchange": exchange,
