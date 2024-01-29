@@ -1,18 +1,12 @@
 from six.moves.urllib.parse import urljoin
-import sys
-import csv
 import json
-import dateutil.parser
-import hashlib
 import logging
-import datetime
-import smartapi.smartExceptions as ex
+import SmartApi.smartExceptions as ex
 import requests
 from requests import get
 import re, uuid
 import socket
-import platform
-from smartapi.version import __version__, __title__
+from SmartApi.version import __version__, __title__
 
 log = logging.getLogger(__name__)
 #user_sys=platform.system()
@@ -50,7 +44,13 @@ class SmartConnect(object):
         "api.gtt.details":"/rest/secure/angelbroking/gtt/v1/ruleDetails",
         "api.gtt.list":"/rest/secure/angelbroking/gtt/v1/ruleList",
 
-        "api.candle.data":"/rest/secure/angelbroking/historical/v1/getCandleData"
+        "api.candle.data":"/rest/secure/angelbroking/historical/v1/getCandleData",
+        "api.market.data":"/rest/secure/angelbroking/market/v1/quote",
+        "api.search.scrip": "/rest/secure/angelbroking/order/v1/searchScrip",
+        "api.allholding": "/rest/secure/angelbroking/portfolio/v1/getAllHolding",
+
+        "api.individual.order.details": "/rest/secure/angelbroking/order/v1/details/",
+        "api.margin.api" : 'rest/secure/angelbroking/margin/v1/batch'
     }
 
 
@@ -230,22 +230,23 @@ class SmartConnect(object):
         if loginResultObject['status']==True:
             jwtToken=loginResultObject['data']['jwtToken']
             self.setAccessToken(jwtToken)
-            refreshToken=loginResultObject['data']['refreshToken']
-            feedToken=loginResultObject['data']['feedToken']
+            refreshToken = loginResultObject['data']['refreshToken']
+            feedToken = loginResultObject['data']['feedToken']
             self.setRefreshToken(refreshToken)
             self.setFeedToken(feedToken)
-            user=self.getProfile(refreshToken)
-        
-            id=user['data']['clientcode']
-            #id='D88311'
-            self.setUserId(id)
-            user['data']['jwtToken']="Bearer "+jwtToken
-            user['data']['refreshToken']=refreshToken
+            user = self.getProfile(refreshToken)
 
-            
+            id = user['data']['clientcode']
+            # id='D88311'
+            self.setUserId(id)
+            user['data']['jwtToken'] = "Bearer " + jwtToken
+            user['data']['refreshToken'] = refreshToken
+            user['data']['feedToken'] = feedToken
+
             return user
         else:
             return loginResultObject
+            
     def terminateSession(self,clientCode):
         logoutResponseObject=self._postRequest("api.logout",{"clientcode":clientCode})
         return logoutResponseObject
@@ -335,6 +336,10 @@ class SmartConnect(object):
         holdingResponse= self._getRequest("api.holding")
         return holdingResponse
     
+    def allholding(self):
+        allholdingResponse= self._getRequest("api.allholding")
+        return allholdingResponse
+    
     def convertPosition(self,positionParams):
         params=positionParams
         for k in list(params.keys()):
@@ -402,7 +407,60 @@ class SmartConnect(object):
                 del(params[k])
         getCandleDataResponse=self._postRequest("api.candle.data",historicDataParams)
         return getCandleDataResponse
+    
+    def getMarketData(self,mode,exchangeTokens):
+        params={
+            "mode":mode,
+            "exchangeTokens":exchangeTokens
+        }
+        marketDataResult=self._postRequest("api.market.data",params)
+        return marketDataResult
+    
+    def searchScrip(self, exchange, searchscrip):
+        params = {
+            "exchange": exchange,
+            "searchscrip": searchscrip
+        }
+        searchScripResult = self._postRequest("api.search.scrip", params)
+        if searchScripResult["status"] is True and searchScripResult["data"]:
+            message = f"Search successful. Found {len(searchScripResult['data'])} trading symbols for the given query:"
+            symbols = ""
+            for index, item in enumerate(searchScripResult["data"], start=1):
+                symbol_info = f"{index}. exchange: {item['exchange']}, tradingsymbol: {item['tradingsymbol']}, symboltoken: {item['symboltoken']}"
+                symbols += "\n" + symbol_info
+            print(message + symbols)
+            return searchScripResult
+        elif searchScripResult["status"] is True and not searchScripResult["data"]:
+            print("Search successful. No matching trading symbols found for the given query.")
+            return searchScripResult
+        else:
+            return searchScripResult
         
+    def make_authenticated_get_request(self, url, access_token):
+        headers = self.requestHeaders()
+        if access_token:
+            headers["Authorization"] = "Bearer " + access_token
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = json.loads(response.text)
+            return data
+        else:
+            print("Error:", response.status_code)
+            return None
+            
+    def individual_order_details(self, qParam):
+        url = self._rootUrl + self._routes["api.individual.order.details"] + qParam
+        try:
+            response_data = self.make_authenticated_get_request(url, self.access_token)
+            return response_data
+        except Exception as e:
+            print(str(e))
+            return None
+    
+    def getMarginApi(self,params):
+        marginApiResult=self._postRequest("api.margin.api",params)
+        return marginApiResult
+ 
     def _user_agent(self):
         return (__title__ + "-python/").capitalize() + __version__   
 

@@ -1,7 +1,7 @@
 
 import pyotp
 import document
-from smartapi import SmartConnect
+from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
 from smartWebSocketV2 import SmartWebSocketV2
 
 api_key = document.api_key

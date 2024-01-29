@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import pyotp
-from smartapi import SmartConnect
+from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
 # from smartapi import WebSocket
 # from smartapi import exceptions
 from datetime import datetime, timedelta

@@ -169,7 +169,7 @@ def strategy():
     global obj
 
     current_date_time = datetime.datetime.now()
-    form_date = current_date_time - timedelta(days=10)
+    form_date = current_date_time - timedelta(days=4)
 
     api_key = document.api_key
     user_id = document.user_id
@@ -207,53 +207,24 @@ def strategy():
                 df["ema"] = ta.ema(df["close"], length=200)
 
                 df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'up', 'down'), np.NaN)
+                df['pivot'] = (df['high'] + df['low'] + df['close']) / 3
+                df['R1'] = (2 * df['pivot'] - df['low'])
+                df['S1'] = (2 * df['pivot'] - df['high'])
+                df['R2'] = (df['pivot']) + (df['high'] - df['low'])
+                df['S2'] = (df['pivot']) - (df['high'] - df['low'])
+                df['R3'] = (df['R1']) + (df['high'] - df['low'])
+                df['S3'] = (df['S1']) - (df['high'] - df['low'])
+
 
                 # df['stx'] = 'down' if df['sup'].values > df['close'].values else 'up'
 
                 df.dropna(inplace=True)
                 # print(df.tail(40))
-                print('#------------------------------' ,script,df.close.values[-5],df.close.values[-4],df.close.values[-3],df.close.values[-2],"----",df.sup.values[-1],'-----------------------#',format(datetime.datetime.now()))
-
-                sup_cl = df.stx.values[-1]
-                sup_pre = df.stx.values[-2]
+                # print(script,df.pivot.values['1'],df.R1.values['1'],df.R2.values['1'],df.R3.values['1'],df.S1.values['1'],df.S3.values['1'],df.S3.values['1'])
+                print(df)
 
 
-                if not df.empty:
 
-                    sup_cl = df.sup.values[-1]
-                    close_cl = df.close.values[-1]
-                    # pre close
-                    sup_pre = df.sup.values[-2]
-                    close_pre = df.close.values[-2]
-
-                    # 3 close
-                    sup_pre3 = df.sup.values[-3]
-                    close_pre3 = df.close.values[-3]
-
-                    if not df.empty:
-                        if close_pre >= sup_pre and close_cl < sup_cl and (script not in sell_traded_stock):
-                            sell_traded_stock.append(script)
-                            print(script, token, "SELL")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "SELL")
-
-                            # getposition = obj.position()
-                            # print("Holding______",getposition.data)
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "SELL")
-
-                        if close_pre <= sup_pre and close_cl > sup_cl and (script not in buy_traded_stock):
-                            buy_traded_stock.append(script)
-                            print(script, token, "BUY")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "BUY")
-                            # getposition = obj.position()
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "BUY")
 
             time.sleep(1)
 

@@ -1,17 +1,10 @@
-import time
-
 from tvDatafeed import TvDatafeed, Interval
 
-username = 'chetancindia857'
-password = 'Abc@123'
+username = 'YourTradingViewUsername'
+password = 'YourTradingViewPassword'
 
-tv = TvDatafeed()
+tv = TvDatafeed(username, password)
+print(tv)
 
-# index
-def getdata():
-    niftydara =  tv.get_hist(symbol='NIFTY',exchange='NSE',interval=Interval.in_5_minute,n_bars=100)
-    print((niftydara))
-
-while True:
-    getdata()
-    time.sleep(0.5)
+nifty_index_data = tv.get_hist(symbol='NIFTY',exchange='NSE',interval=Interval.in_1_hour,n_bars=1000)
+print(nifty_index_data)

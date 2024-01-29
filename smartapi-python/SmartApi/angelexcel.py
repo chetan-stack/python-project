@@ -15,14 +15,16 @@
 # pip install xlwings
 # xlwings addin install
 
-from smartapi import SmartConnect, SmartWebSocket
+from SmartApi import SmartConnect, SmartWebSocket  # or from SmartApi.smartConnect import SmartConnect
 # import document_detail_Lax
 import time
 import datetime
-import talib as ta
+# import talib as ta
 import xlwings as xw
 import pandas as pd
 import pyotp
+import os
+
 
 api_key = "pMZtYR5S"
 user_id = "c182721"
@@ -31,7 +33,13 @@ totp = pyotp.TOTP("ELAC7LJCYC6ENWQBWNEGRGV66U").now()
 obj = SmartConnect(api_key=api_key)
 
 exchange = "NSE"
-sheet = xw.Book("jetbrains://pycharm/navigate/reference?project=SmartApi&path=angel_excel.xlsx").sheets[0]
+# Get the current script's directory
+script_directory = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the full path to the Excel file
+file_path = os.path.join(script_directory, "angel_excel.xlsx")
+
+sheet = xw.Book(file_path).sheets[0]
 sheet.range("B1:M300").clear_contents()
 tickerlist = sheet.range("A2").expand("down").value
 buy_traded_stocks = []
@@ -1697,7 +1705,7 @@ script_list = {
 }
 
 def orderManagement():
-    sheet = xw.Book("F:/angel/new angel/angel_excel.xlsx").sheets[0]
+    sheet = xw.Book("/Users/mac/PycharmProjects/pythonProject/SmartApi/angel_excel.xlsx").sheets[0]
     sheet.range(f"A1:K200").autofit()
     for i in range(2, (len(tickerlist)+2)):
         Status = sheet.range('I' + str(i)).value

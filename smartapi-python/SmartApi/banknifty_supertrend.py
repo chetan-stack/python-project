@@ -52,11 +52,7 @@ ma_short = 13
 ma_long = 22
 runcount = 0
 selltradednity = []
-buytradednifty = []
-
-targettobuy = ''
-targettosell = ''
-targettoexit = ''
+buytradedBANKNIFTY = []
 
 
 def initialisedTockenMap():
@@ -76,17 +72,17 @@ def getTokenInfo(exch_seg,instrumenttype,symbol,strike_price,pe_ce, expiry_day =
     if exch_seg == 'NSE':
         # print('nse')
         eq_df = df[(df['exch_seg'] == 'NSE')]
-        # print(eq_df[(eq_df['name'] == 'NIFTY')],'---####---')
-        return eq_df[(eq_df['name'] == 'NIFTY')]
+        # print(eq_df[(eq_df['name'] == 'BANKNIFTY')],'---####---')
+        return eq_df[(eq_df['name'] == 'BANKNIFTY')]
     elif exch_seg == 'NFO' and (instrumenttype == 'OPTSTK' or instrumenttype == 'OPTIDX'):
         print('nfo')
         return df[(df['exch_seg'] == 'NFO') & (df['instrumenttype'] == instrumenttype) & (df['name'] == symbol) & ((df['strike'] == strike_price)) & (df['symbol'].str.endswith(pe_ce)) & (df['expiry'] >= str(datetime.date.today()))].sort_values(by=['expiry'])
 
 def placeorderdetails():
-    tokeninfo = getTokenInfo('NSE', 'OPTIDX', 'NIFTY', '', '').iloc[0]['token']
+    tokeninfo = getTokenInfo('NSE', 'OPTIDX', 'BANKNIFTY', '', '').iloc[0]['token']
     print(tokeninfo, "---fghjk")
-    global LTP
-    LTP = obj.ltpData('NSE', 'NIFTY', tokeninfo)['data']['ltp']
+
+    LTP = obj.ltpData('NSE', 'BANKNIFTY', tokeninfo)['data']['ltp']
     RTM = int(round(LTP / 100) * 100)  # to get check acurate price
     print(LTP, RTM)
     ## now check price and place order details
@@ -94,21 +90,19 @@ def placeorderdetails():
     global ce_symbol
     global pe_symbol
 
-    ce_symbol = getTokenInfo('NFO', 'OPTIDX', 'NIFTY', RTM, 'CE').iloc[0]
-    pe_symbol = getTokenInfo('NFO', 'OPTIDX', 'NIFTY', RTM, 'PE').iloc[0]
 
+    ce_symbol = getTokenInfo('NFO', 'OPTIDX', 'BANKNIFTY', RTM, 'CE').iloc[0]
+    pe_symbol = getTokenInfo('NFO', 'OPTIDX', 'BANKNIFTY', RTM, 'PE').iloc[0]
+    # print(ce_symbol,pe_symbol)
 
 def PlaceOredrExit():
     placeOREDR = False
 
 def getorderBook():
-    tradebook = obj.position()
+    # OrderBook = obj.position()
     # print(OrderBook)
-    #if len(selltradednity) > 0 or len(buy_traded_stock) > 0:
-    if tradebook['data'] is not None:
-        for a in tradebook['data']:
-            if a['symbolname'] == 'NIFTY':
-                return False
+    if len(selltradednity) > 0 or len(buytradedBANKNIFTY) > 0:
+        return False
     else:
         return True
 
@@ -253,12 +247,13 @@ def strategy():
         # print(obj)
 
         tv = TvDatafeed()
-        hist_data = tv.get_hist(symbol='NIFTY',exchange='NSE',interval=Interval.in_5_minute,n_bars=50)
-        # print(hist_data)
+        hist_data = tv.get_hist(symbol='BANKNIFTY',exchange='NSE',interval=Interval.in_5_minute,n_bars=50)
+        print(hist_data)
         if not hist_data.empty:
             df = pd.DataFrame(
                 hist_data,
                 columns=['date', 'open', 'high', 'low', 'close','volume'])
+            print(df)
 
             df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
             df["ema"] = ta.ema(df["close"], length=200)
@@ -266,7 +261,6 @@ def strategy():
 
             if not df.empty:
                 print('#------------------------------' ,df.close.values[-5],df.close.values[-4],df.close.values[-3],df.close.values[-2],"----",df.sup.values[-1],'-----------------------#',format(datetime.datetime.now()))
-
                 sup_cl = df.sup.values[-1]
                 close_cl = df.close.values[-1]
                 # pre close
@@ -280,49 +274,46 @@ def strategy():
                 # 4 close
                 sup_pre4 = df.sup.values[-4]
                 close_pre4 = df.close.values[-4]
-
-
-                # print('order book',getorderBook())
+                print('order book',getorderBook())
                 if not df.empty:
-                    if getorderBook():  # (check if Nifty order is not placed)
-                        if close_pre > sup_pre and close_cl < sup_cl and ('nifty' not in buytradednifty):
-                            # GettingLtpData('nifty', close_cl, "SELL")
-                            place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
-                                        'MARKET', 0)
-                            buytradednifty.append('nifty')
-
-
-                        elif close_pre < sup_pre and close_cl > sup_cl and ('nifty' not in buytradednifty):
-                            # GettingLtpData('nifty', close_cl, "BUY")
-                            place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
-                                        'MARKET', 0)
-                            buytradednifty.append('nifty')
-
-                        elif close_pre4 <= sup_pre4 and close_pre3 <= sup_pre3 and close_pre <= sup_pre and close_cl < sup_cl and ('nifty' not in buytradednifty):
-                            # GettingLtpData('nifty', close_cl, "SELL")
-                            buytradednifty.append('nifty')
+                    if getorderBook():  # (check if BANKNIFTY order is not placed)
+                        if close_pre >= sup_pre and close_cl < sup_cl and ('BANKNIFTY' not in buytradedBANKNIFTY):
+                            selltradednity.append('BANKNIFTY')
+                            # GettingLtpData('BANKNIFTY', close_cl, "SELL")
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0)
 
-                        elif close_pre4 >= sup_pre4 and close_pre3 >= sup_pre3 and close_pre >= sup_pre and close_cl > sup_cl and ('nifty' not in buytradednifty):
-                            # GettingLtpData('nifty', close_cl, "BUY")
+                        elif close_pre <= sup_pre and close_cl > sup_cl ('BANKNIFTY' not in buytradedBANKNIFTY):
+                            # GettingLtpData('BANKNIFTY', close_cl, "BUY")
+                            place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
+                                        'MARKET', 0)
+                            buytradedBANKNIFTY.append('BANKNIFTY')
+
+                        elif close_pre4 <= sup_pre4 and close_pre3 <= sup_pre3 and close_pre <= sup_pre and close_cl < sup_cl and ('BANKNIFTY' not in buytradedBANKNIFTY):
+                            # GettingLtpData('BANKNIFTY', close_cl, "SELL")
+                            selltradednity.append('BANKNIFTY')
+                            place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
+                                        'MARKET', 0)
+
+                        elif close_pre4 >= sup_pre4 and close_pre3 >= sup_pre3 and close_pre >= sup_pre and close_cl > sup_cl and ('BANKNIFTY' not in buytradedBANKNIFTY):
+                            # GettingLtpData('BANKNIFTY', close_cl, "BUY")
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0)
 
-                            buytradednifty.append('nifty')
+                            buytradedBANKNIFTY.append('BANKNIFTY')
 
-                    else:  # (if Nifty order is placed, then run exit script with supertrend)
-                        if close_pre >= sup_pre and close_cl < sup_cl and ('nifty' not in selltradednity):
-                            # GettingLtpData('nifty', close_cl, "SELL")   # (run exit script)
+                    else:  # (if BANKNIFTY order is placed, then run exit script with supertrend)
+                        if close_pre >= sup_pre and close_cl < sup_cl and ('BANKNIFTY' not in selltradednity):
+                            # GettingLtpData('BANKNIFTY', close_cl, "SELL")   # (run exit script)
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0)
-                            selltradednity.append('nifty')
+                            selltradednity.append('BANKNIFTY')
 
-                        elif close_pre <= sup_pre and close_cl > sup_cl and ('nifty' not in selltradednity):
-                            # GettingLtpData('nifty', close_cl, "BUY")   # (run exit script)
+                        elif close_pre <= sup_pre and close_cl > sup_cl and ('BANKNIFTY' not in selltradednity):
+                            # GettingLtpData('BANKNIFTY', close_cl, "BUY")   # (run exit script)
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0)
-                            selltradednity.append('nifty')
+                            buytradedBANKNIFTY.append('BANKNIFTY')
 
             time.sleep(1)
 
@@ -358,7 +349,7 @@ def strategy():
 # except Exception as e:
 #     print("Build Connection Error: {}".format(e), format(datetime.datetime.now()))
 initialisedTockenMap()
-strategy()
+# strategy()
 schedule.every(2).minutes.do(strategy)
 # schedule.every(5).minutes.do(checkorderlimit)
 schedule.every().day.at("15:05").do(exitQuert)
@@ -371,7 +362,7 @@ while True:
         # print("start tym , CURRENT TIME:{}".format(datetime.datetime.now()))
         try:
             schedule.run_pending()
-            time.sleep(2)   
+            time.sleep(2)
         except Exception as e:
             raise e
 

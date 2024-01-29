@@ -1,4 +1,4 @@
-from smartapi import SmartConnect
+from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
 import time
 from datetime import datetime,timedelta
 import datetime
