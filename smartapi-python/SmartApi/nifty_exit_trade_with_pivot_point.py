@@ -124,25 +124,55 @@ def definesupportlevel(fibo_level,close):
   return max_key
 
 
-def orderplacewithpivot(df,param):
+def orderplacewithpivot(df, param):
     print(pivot_fibo_level)
-    Method_pe = 'ce' if param == 'buy' else 'pe'
-    Methor_ce = 'pe' if param == 'sell' else 'ce'
-    r_level = defineresistancelevel(pivot_fibo_level,df.close.values[-1])
-    s_level = definesupportlevel(pivot_fibo_level,df.close.values[-1])
+    Method = 'pe' if param == 'buy' else ('ce' if param == 'sell' else None)
+    r_level = defineresistancelevel(pivot_fibo_level, df.close.values[-1])
+    s_level = definesupportlevel(pivot_fibo_level, df.close.values[-1])
 
-    print('resistance',r_level,'supports',s_level)
+    # print('resistance', r_level, 'supports', s_level,'close',df.close.values[-1],'second-right-high',df.high.values[-2] )
 
     if r_level in pivot_fibo_level or s_level in pivot_fibo_level:
+        print(param,df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level])
+        if param == 'buy':
+            if df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
 
-        if df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
-                return Method_pe
-        elif df.low.values[-1] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
-                return Methor_ce
-        else:
-              print ("nothing")
+                return 'pe'
+
+            elif df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
+
+                return 'ce'
+
+        elif param == 'sell':
+            if df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[s_level]:
+                return 'ce'
+
+            elif df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
+
+                 return 'pe'
+
     else:
-        print ("nothing")
+        print("nothing")
+
+# def orderplacewithpivot(df,param):
+#     print(pivot_fibo_level)
+#     Method_pe = 'ce' if param == 'buy' else 'pe'
+#     Methor_ce = 'pe' if param == 'sell' else 'ce'
+#     r_level = defineresistancelevel(pivot_fibo_level,df.close.values[-1])
+#     s_level = definesupportlevel(pivot_fibo_level,df.close.values[-1])
+#
+#     print('resistance',r_level,'supports',s_level)
+#
+#     if r_level in pivot_fibo_level or s_level in pivot_fibo_level:
+#
+#         if df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
+#                 return Method_pe
+#         elif df.low.values[-1] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
+#                 return Methor_ce
+#         else:
+#               print ("nothing")
+#     else:
+#         print ("nothing")
 
 
 
@@ -384,8 +414,10 @@ def strategy():
                 sup_pre4 = df.sup.values[-4]
                 close_pre4 = df.close.values[-4]
 
-                print(getorderBook(),'check gerate order')
-                # print('order book',getorderBook())
+                r_level = defineresistancelevel(pivot_fibo_level,df.close.values[-1])
+                s_level = definesupportlevel(pivot_fibo_level,df.close.values[-1])
+
+                # print(getorderBook(),'check gerate order')
                 if not df.empty:
                     if getorderBook():  # (check if Nifty order is not placed)
                         if close_pre >= sup_pre and close_cl < sup_cl:
@@ -394,39 +426,26 @@ def strategy():
                                         'MARKET', 0)
                             buytradednifty.append('nifty')
 
-
                         elif close_pre <= sup_pre and close_cl > sup_cl:
                             # GettingLtpData('nifty', close_cl, "BUY")
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0)
                             buytradednifty.append('nifty')
 
-                        # elif close_pre4 <= sup_pre4 and close_pre3 <= sup_pre3 and close_pre <= sup_pre and close_cl < sup_cl and ('nifty' not in buytradednifty):
-                        #     # GettingLtpData('nifty', close_cl, "SELL")
-                        #     buytradednifty.append('nifty')
-                        #     place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
-                        #                 'MARKET', 0)
-                        #
-                        # elif close_pre4 >= sup_pre4 and close_pre3 >= sup_pre3 and close_pre >= sup_pre and close_cl > sup_cl and ('nifty' not in buytradednifty):
-                        #     # GettingLtpData('nifty', close_cl, "BUY")
-                        #     place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
-                        #                 'MARKET', 0)
-                        #
-                        #     buytradednifty.append('nifty')
-
-
-                        elif close_pre > sup_pre  and orderplacewithpivot(df,'buy') == 'ce':
+                        elif close_pre > sup_pre and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0)
-
                             buytradednifty.append('nifty')
 
-                        elif close_pre < sup_pre  and orderplacewithpivot(df,'buy') == 'pe':
+                        elif close_pre < sup_pre and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
                             buytradednifty.append('nifty')
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0)
+                        else:
+                            print('not match')
 
                     else:  # (if Nifty order is placed, then run exit script with supertrend)
+                        print('error here -----')
                         if close_pre >= sup_pre and close_cl < sup_cl:
                             # GettingLtpData('nifty', close_cl, "SELL")   # (run exit script)
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
@@ -438,18 +457,23 @@ def strategy():
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0)
                             selltradednity.append('nifty')
-                        elif close_pre >= sup_pre and orderplacewithpivot(df,'sell') == 'ce':
+
+                        elif close_pre > sup_pre and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0)
-
                             buytradednifty.append('nifty')
-                        elif close_pre <= sup_pre and orderplacewithpivot(df,'sell') == 'pe':
+
+                        elif close_pre < sup_pre and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0)
-
                             buytradednifty.append('nifty')
-
+                        else:
+                            print('not match')
+                else:
+                    print('df empty')
             time.sleep(1)
+        else:
+            print('not working')
 
 
 
