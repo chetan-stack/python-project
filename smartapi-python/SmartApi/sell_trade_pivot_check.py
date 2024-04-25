@@ -1,4 +1,5 @@
 from tvDatafeed import TvDatafeed,Interval
+
 from SmartApi import SmartConnect #or from SmartApi.smartConnect import SmartConnect
 import time
 from datetime import datetime,timedelta
@@ -12,7 +13,7 @@ import pyotp
 import schedule
 import math
 import requests
-import crete_update_table
+
 import document
 
 current_date_time = datetime.datetime.now()
@@ -32,10 +33,11 @@ tradtestocks = {
 }
 script_list = {
 
-    'RALLIS-EQ' : "2816",
-    'TCS-EQ': '11536',
-    "AMBUJACEM-EQ": "1270",
-    "ADANIPORTS-EQ": "15083",
+    'JSWSTEEL-EQ': '11723',
+
+    # "ACC-EQ": "22",
+    # "AMBUJACEM-EQ": "1270",
+    # "ADANIPORTS-EQ": "15083",
     # "ADANIENT-EQ": "25",
     # "AWL-EQ":"8110",
     # 'RALLIS-EQ':"2816",
@@ -50,9 +52,6 @@ per_trade_fund = 10000
 ma_short = 13
 ma_long = 22
 runcount = 0
-
-
-
 
 def fetchdataandreturn_pivot(symbol):
     username = 'YourTradingViewUsername'
@@ -89,43 +88,35 @@ def fetchdataandreturn_pivot(symbol):
         global pivot_fibo_level
         pivot_fibo_level = fibonacci_levels
 
-
 def setAlreadyBuySellRecord(data):
+    for a in data:
+        if a['netqty'] == 1:
+            buy_traded_stock.append(a['tradingsymbol'])
+        elif a['netqty'] == -1:
+            sell_traded_stock.append(a['tradingsymbol'])
+        else:
+            print(a['netqty'])
 
-    if data is not None:
-        for a in data:
-            #print(int(a['netqty']),a['tradingsymbol'] )
-            if a['netqty'] != '0' and int(a['netqty']) > 0 and (a['tradingsymbol'] not in buy_traded_stock):
-                buy_traded_stock.append(a['tradingsymbol'])
-            elif a['netqty'] != '0' and int(a['netqty']) < 1 and (a['tradingsymbol'] not in sell_traded_stock):
-                sell_traded_stock.append(a['tradingsymbol'])
+def getorderBook(symbol):
+    tradebook = obj.position()
 
-        print('buy_traded_stock',buy_traded_stock)
-        print('sell_traded_stock',sell_traded_stock)
-
-    else:
-        print('data is null')
-
-def getorderBook(symbol,orderbook):
-    tradebook = orderbook
-    isscript = crete_update_table.get_data(symbol)
-    #optenPosition = crete_update_table.orderbook()
-    #isscript = len(optenPosition) == 0 if True else any(item['script'] != symbol for item in optenPosition)
-    print(len(isscript),symbol,crete_update_table.get_data(symbol),' is script' )
+    print(tradebook)
+    #if len(selltradednity) > 0 or len(buytradednifty) > 0:
     if tradebook['data'] is not None:
+        setAlreadyBuySellRecord(tradebook['data'])
         for a in tradebook['data']:
-            # print('quantity : ',a['netqty'], 'script : ',a['tradingsymbol'],int(a['netqty']) <= 0)
-            if a['netqty'] != '0' and len(isscript) == 0 and a['tradingsymbol'] == symbol:
-                ordertype = a['netqty']
-                crete_update_table.insertscript(a['tradingsymbol'],ordertype)
-            elif int(a['netqty']) <= 0 and a['tradingsymbol'] == symbol:
-                print('delete run')
-                crete_update_table.deletescript(a['tradingsymbol'])
-
-        print('not action found : ', symbol)
+            # buy_traded_stock.append((a['tradingsymbol']))
+            print(a['netqty'], a['tradingsymbol'],symbol)
+            # if a['tradingsymbol'] == symbol:
+            #     # Symbol found, return False
+            #     return False
+        # Symbol not found in any item, return True
+        return True
     else:
-        print('no order found for script : ',symbol)
+        # If tradebook['data'] is None, return True
+        return True
 
+# buyavgprice sellavgprice
 
 def defineresistancelevel(fibo_level,close):
   data = fibo_level
@@ -207,11 +198,12 @@ def sendAlert(bot_message):
     return response.json()
 
 
-def GettingLtpData(script, token, order,stoploss,squaroff):
+def GettingLtpData(script, token, order):
     LTP = obj.ltpData(exchange, script, token)
 #     print(LTP)
     ltp = LTP["data"]["ltp"]
-    # quantity = int(per_trade_fund * 10 / ltp)    # quantity = int(per_trade_fund / ltp)
+    # quantity = int(per_trade_fund / ltp)
+    # quantity = int(per_trade_fund * 10 / ltp)
     quantity = 1
 
 
@@ -225,8 +217,8 @@ def GettingLtpData(script, token, order,stoploss,squaroff):
         "producttype": "INTRADAY",
         "duration": "DAY",
         "price": ltp,
-        "squareoff": '0',
-        "stoploss": '0',
+        "squareoff": "0",
+        "stoploss": "0",
         "quantity": quantity
     }
 
@@ -298,7 +290,6 @@ def strategy():
         jwtToken = token['data']["jwtToken"]
         refreshToken = token['data']['refreshToken']
         feedToken = token['data']['feedToken']
-        orderbook = obj.position()
         print(token)
         for script, token in script_list.items():
             historicParam = {
@@ -310,8 +301,6 @@ def strategy():
             }
             hist_data = obj.getCandleData(historicParam)["data"]
             LTP = obj.ltpData(exchange, script, token)
-            getorderBook(script,orderbook)
-
             # print(LTP)
             # print("__________hist",hist_data)
             if hist_data != None:
@@ -321,17 +310,19 @@ def strategy():
                 df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
                 # df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3)['SUPERT_10_3.0']
                 df["ema"] = ta.ema(df["close"], length=200)
-                df["ema10"] = ta.ema(df["close"], length=10)
 
                 df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'up', 'down'), np.NaN)
 
                 # df['stx'] = 'down' if df['sup'].values > df['close'].values else 'up'
+
                 df.dropna(inplace=True)
                 # print(df.tail(40))
                 print('#------------------------------' ,script,df.close.values[-5],df.close.values[-4],df.close.values[-3],df.close.values[-2],"----",df.sup.values[-1],'-----------------------#',format(datetime.datetime.now()))
 
                 sup_cl = df.stx.values[-1]
                 sup_pre = df.stx.values[-2]
+                checktradebook = getorderBook(script)
+                print(checktradebook)
                 if not df.empty:
 
                     sup_cl = df.sup.values[-1]
@@ -349,109 +340,45 @@ def strategy():
 
                     r_level = defineresistancelevel(pivot_fibo_level,df.close.values[-1])
                     s_level = definesupportlevel(pivot_fibo_level,df.close.values[-1])
-                    stoplossbuy = df.close.values[-1] - df.low.values[-1]
-                    stoplosssell = df.high.values[-1] - df.close.values[-1]
-                    squaroff = "100"
-                    optenPosition = crete_update_table.orderbook()
-                    isscript = crete_update_table.get_data(script)
-                    print(len(isscript),'script length')
-                    condition_buy = len(isscript) == 0
-                    condition_exit_sell = any(item['script'] == script and int(item['ordertype']) < 0 for item in optenPosition)
-                    condition_exit_buy = any(item['script'] == script and int(item['ordertype']) > 0 for item in optenPosition)
-
-                    print('condition_buy',condition_buy,'condition_exit_buy',condition_exit_buy,'condition_exit_sell',condition_exit_sell)
 
 
                     if not df.empty:
-                        #print(script,sell_traded_stock)
-                        #print(script in sell_traded_stock)
-                        print('resistance:',r_level,'support',s_level, 'script is not in trade:',optenPosition,condition_buy)
+                        print(checktradebook)
+                        print(not checktradebook)
+                        print('check true',not checktradebook and close_pre < sup_pre and df.low.values[-7] <= pivot_fibo_level[s_level] and df.close.values[-6] > pivot_fibo_level[s_level] and (script not in buy_traded_stock))
+                        #exit----
 
-                        if close_pre >= sup_pre and close_cl < sup_cl and condition_buy:
-                            sell_traded_stock.append(script)
-                            print(script, token, "SELL")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "SELL",stoplosssell,squaroff)
-
-                            # getposition = obj.position()
-                            # print("Holding______",getposition.data)
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "SELL")
-
-                        elif close_pre <= sup_pre and close_cl > sup_cl and condition_buy:
-                            buy_traded_stock.append(script)
-                            print(script, token, "BUY")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "BUY",stoplossbuy,squaroff)
-                            # getposition = obj.position()
-                            # if script in getposition['data']['tradingsymbol']:
-                            #     GettingLtpData(script, token, "BUY")
-
-                        # elif checktradebook and close_pre < sup_pre and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level] and (script not in sell_traded_stock):
-                        #     # sell_traded_stock.append(script)
+                        # if not checktradebook and close_pre < sup_pre and df.low.values[-7] <= pivot_fibo_level[s_level] and df.close.values[-6] > pivot_fibo_level[s_level] and (script not in buy_traded_stock):
+                        #     buy_traded_stock.append(script)
+                        #     print(script, token, "BUY")
+                        #     f = open("storeStock.txt", "a")
+                        #     f.write(str(script) + "----" + str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
+                        #     f.close()
+                        #     GettingLtpData(script, token, "BUY")
+                        #
+                        # elif not checktradebook and close_pre > sup_pre and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level] and (script not in sell_traded_stock):
+                        #     sell_traded_stock.append(script)
                         #     print(script, token, "SELL")
                         #     f = open("storeStock.txt", "a")
                         #     f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
                         #     f.close()
                         #     GettingLtpData(script, token, "SELL")
-                        #
-                        elif condition_buy and close_pre > sup_pre and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
-                        #     # buy_traded_stock.append(script)
-                        #     print(script, token, "BUY")
-                        #     f = open("storeStock.txt", "a")
-                        #     f.write(str(script) + "----" + str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                        #     f.close()
-                            GettingLtpData(script, token, "BUY",stoplossbuy,squaroff)
-
-                        #exit----
-                        elif condition_exit_sell and close_pre < sup_pre and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
-                            buy_traded_stock.append(script)
-                            print('exit 1')
-                            print(script, token, "BUY")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------BUY-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "BUY",'0','0')
-
-                        elif condition_exit_buy  and close_pre > sup_pre and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
-                            sell_traded_stock.append(script)
-                            print('exit 2')
-                            print(script, token, "SELL")
-                            f = open("storeStock.txt", "a")
-                            f.write(str(script) + "----" + str(token) + "---------SELL-----------" + "----" + str(LTP['data']['ltp'])+ str(current_date_time) + '\n')
-                            f.close()
-                            GettingLtpData(script, token, "SELL",'0',squaroff)
-
-                        elif df.close.values[-1] < df.ema.values[-1] and condition_exit_buy:
-                             sell_traded_stock.append(script)
-                             print('exit 3')
-                             GettingLtpData(script, token, "SELL",'0',squaroff)
-
-                        elif df.close.values[-1] > df.ema.values[-1] and condition_exit_sell:
-                             buy_traded_stock.append(script)
-                             print('exit 4')
-                             GettingLtpData(script, token, "BUY",'0',squaroff)
 
 
-                        else:
-                            print(script,'not match')
+                        # else:
+                        #     print(script,'not match')
 
                     else:
                        print(script,'not match')
             else:
                 print('not done')
-            time.sleep(5)
+            time.sleep(2)
 
     except Exception as e:
         print("Historic Api failed: {}".format(e),format(datetime.datetime.now()))
         bot_message = f"Historic Api failed {e}"
         sendAlert(bot_message)
         strategy()
-        time.sleep(5)
 
     try:
         logout = obj.terminateSession(user_id)

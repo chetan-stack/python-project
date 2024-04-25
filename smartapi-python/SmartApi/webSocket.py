@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 class SmartSocketClientProtocol(WebSocketClientProtocol):
 
     def __init__(self, *args, **kwargs):
-        super(SmartSocketClientProtocol,self).__init__(*args,**kwargs)
+        super(self).__init__(*args,**kwargs)
     
     def onConnect(self, response):  # noqa
         """Called when WebSocket server connection was established"""
@@ -445,4 +445,3 @@ class WebSocket(object):
             j = j + 2 + packet_length
 
         return packets
-    

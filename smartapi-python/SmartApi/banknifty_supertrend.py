@@ -348,8 +348,8 @@ def strategy():
 #
 # except Exception as e:
 #     print("Build Connection Error: {}".format(e), format(datetime.datetime.now()))
-initialisedTockenMap()
-# strategy()
+# initialisedTockenMap()
+strategy()
 schedule.every(2).minutes.do(strategy)
 # schedule.every(5).minutes.do(checkorderlimit)
 schedule.every().day.at("15:05").do(exitQuert)
