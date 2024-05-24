@@ -1,5 +1,5 @@
 import schedule
-from smartapi import SmartConnect
+from SmartApi import SmartConnect  # or from SmartApi.smartConnect import SmartConnect
 import time
 from datetime import datetime
 import datetime
@@ -10,16 +10,16 @@ api_key = document.api_key
 user_id = document.user_id
 password = document.password
 totp = pyotp.TOTP(document.totp).now()
-# print(totp)
 obj = SmartConnect(api_key=api_key)
-obj2 = obj.generateSession(user_id, password,totp)
-# print(obj2)
-
+token = obj.generateToken(obj.generateSession(user_id, password, totp)["data"]["refreshToken"])
 # token = obj.generateToken(obj.generateSession(user_id, password, totp)["data"]["refreshToken"])
 # jwtToken = token['data']["jwtToken"]
 # refreshToken = token['data']['refreshToken']
 # feedToken = token['data']['feedToken']
 # print(obj2)
+
+quantity = 10
+
 f_only = {"MARUTI-EQ": "10999", "LALPATHLAB-EQ": "11654", "IDFCFIRSTB-EQ": "11184", "CONCOR-EQ": "4749",
           "PEL-EQ": "2412", "MUTHOOTFIN-EQ": "23650", "ESCORTS-EQ": "958", "PIDILITIND-EQ": "2664",
           "JSWSTEEL-EQ": "11723", "ACC-EQ": "22", "SAIL-EQ": "2963", "ICICIPRULI-EQ": "18652", "GRASIM-EQ": "1232",
@@ -129,14 +129,14 @@ def GettingLtpData():
     while count < 2:
         try:
             for symbol, token in f_only.items():
-                LTP = obj.ltpData(exchange, symbol, token)
-                print(LTP)
+                LTP = obj.ltpData('NSE', symbol, token)
+                # print(LTP)
                 high = LTP["data"]["high"]
                 low = LTP["data"]["low"]
                 ltp = LTP["data"]["ltp"]
                 # quantity = int(invest_per_trade * 10 / ltp)
-                quantity = 1
-                # print(f"Scirpt:{symbol}, High:{high}, Low:{low}, LTP:{ltp}")
+                quantity = quantity
+                print(f"Scirpt:{symbol}, High:{high}, Low:{low}, LTP:{ltp}")
 
                 if (high == ltp) and (symbol not in traded_list):
                     traded_list.append(symbol)
@@ -169,44 +169,55 @@ def filterProfit():
     length_pos = len(getposition['data'])
     countExit = length_pos
 
-    while countExit > 0 and timenow < int(9) * 60 + int(25):
-        try:
+
+    try:
+        if getposition['data'] is not None:
             for a in getposition['data']:
-                LTP = obj.ltpData(a["exchange"], a["tradingsymbol"], a["symboltoken"])
-                getprice = a["avgnetprice"]
-                getltp = LTP["data"]["ltp"]
-                getopen = LTP["data"]["open"]
-                getClose = LTP["data"]["close"]
-                pnl = a['pnl']
+                if a['netqty'] != '0':
+                    LTP = obj.ltpData(a["exchange"], a["tradingsymbol"], a["symboltoken"])
+                    getprice = a["avgnetprice"]
+                    getltp = LTP["data"]["ltp"]
+                    getopen = LTP["data"]["open"]
+                    getClose = LTP["data"]["close"]
+                    pnl = a['pnl']
+                    totalvalue = int(float(a['totalbuyvalue']))
+                    stoploss = float((totalvalue / 100) * 10)
+                    target = float((totalvalue / 100) * 20)
+                    pnltype = 'profit' if int(float(a['unrealised'])) > 0 else 'loss'
 
-                if (int(float(pnl)) < -200) and (a["tradingsymbol"] not in traded_list_filter):
-                    print(a["tradingsymbol"])
-                    traded_list_filter.append(a["tradingsymbol"])
-                    transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
-                    sellOrderExit = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"],
-                                    "symboltoken": a["symboltoken"],
-                                    "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
-                                    "producttype": a["producttype"], "duration": "DAY", "price": getltp,
-                                    "squareoff": "0","stoploss": "0", "quantity": abs(int(a["netqty"]))}
-                    orderSell = obj.placeOrder(sellOrderExit)
-                    countExit = countExit - 1
-                    print(f"{transactionType} order Place for {a['symboltoken']} at : {getltp} with Order id {orderSell} order id quantity :{a['netqty']} ")
+                    if a['netqty'] != '0' and pnltype == 'loss' and abs(int(float(a['unrealised']))) > stoploss and (a["tradingsymbol"] not in traded_list_filter):
+                        print(a["tradingsymbol"])
+                        traded_list_filter.append(a["tradingsymbol"])
+                        transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
+                        sellOrderExit = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"],
+                                        "symboltoken": a["symboltoken"],
+                                        "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
+                                        "producttype": a["producttype"], "duration": "DAY", "price": getltp,
+                                        "squareoff": "0","stoploss": "0", "quantity": abs(int(a["netqty"]))}
+                        orderSell = obj.placeOrder(sellOrderExit)
+                        countExit = countExit - 1
+                        print(f"{transactionType} order Place for {a['symboltoken']} at : {getltp} with Order id {orderSell} order id quantity :{a['netqty']} ")
 
-            if (int(float(pnl)) > 500) and (a["tradingsymbol"] not in traded_list_filter):
+                    if a['netqty'] != '0' and pnltype == 'profit' and abs(int(float(a['unrealised']))) > target and (a["tradingsymbol"] not in traded_list_filter):
 
-                    traded_list_filter.append(a["tradingsymbol"])
-                    transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
+                        traded_list_filter.append(a["tradingsymbol"])
+                        transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
 
-                    buyOrderExit = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"],
-                                    "symboltoken": a["symboltoken"],
-                                    "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
-                                    "producttype": a["producttype"], "duration": "DAY", "price": getltp,
-                                    "squareoff": "0","stoploss": "0", "quantity": abs(int(a["netqty"]))}
-                    orderBuy = obj.placeOrder(buyOrderExit)
-                    countExit = countExit - 1
-                    print(f"{transactionType} order Place for {a['symboltoken']} at : {getltp} with Order id {orderBuy} order id quantity :{a['netqty']} ")
+                        buyOrderExit = {"variety": "NORMAL", "tradingsymbol": a["tradingsymbol"],
+                                        "symboltoken": a["symboltoken"],
+                                        "transactiontype": transactionType, "exchange": a["exchange"], "ordertype": "LIMIT",
+                                        "producttype": a["producttype"], "duration": "DAY", "price": getltp,
+                                        "squareoff": "0","stoploss": "0", "quantity": abs(int(a["netqty"]))}
+                        orderBuy = obj.placeOrder(buyOrderExit)
+                        countExit = countExit - 1
 
-        except Exception as e:
+                        print(f"{transactionType} order Place for {a['symboltoken']} at : {getltp} with Order id {orderBuy} order id quantity :{a['netqty']} ")
+                else:
+                     print('No order Placed')
+
+        else:
+            print('No order Placed')
+    except Exception as e:
             print("error: {}".format(e))
 
     print('finish filtering stock')
@@ -218,11 +229,9 @@ def exitQuert():
     getposition = obj.position()
     try:
         for a in getposition['data']:
-            LTP = obj.ltpData(a["exchange"], a["tradingsymbol"], a["symboltoken"])
-            getltp = LTP["data"]["ltp"]
-
-            if (a["tradingsymbol"] not in traded_list_exit):
-
+            if a['netqty'] != '0':
+                LTP = obj.ltpData(a["exchange"], a["tradingsymbol"], a["symboltoken"])
+                getltp = LTP["data"]["ltp"]
                 traded_list_exit.append(a["tradingsymbol"])
                 transactionType = "SELL" if int(a['netqty']) > 0 else "BUY"
 
@@ -243,8 +252,10 @@ orderplacetime = int(9) * 60 + int(20)
 timenow = (datetime.datetime.now().hour * 60 + datetime.datetime.now().minute)
 print("Waiting for 9.20 AM , CURRENT TIME:{}".format(datetime.datetime.now()))
 
+GettingLtpData()
+schedule.every(0.5).minutes.do(filterProfit)
 schedule.every().day.at("09:20").do(GettingLtpData)
-schedule.every().day.at("09:22").do(filterProfit)
+# schedule.every().day.at("09:22").do(filterProfit)
 schedule.every().day.at("09:25").do(exitQuert)
 
 while True:

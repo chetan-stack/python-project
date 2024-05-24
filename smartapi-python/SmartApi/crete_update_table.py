@@ -72,7 +72,7 @@ def get_data(script):
         print(data)
     return data
 
-#deletescript('TCS-EQ')
+#deletescript('NCC-EQ')
 #get_data('abc')
 #insertscript('RALLIS-EQ','BUY')
 #insertscript('abc')

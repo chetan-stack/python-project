@@ -55,7 +55,7 @@ ma_short = 13
 ma_long = 22
 runcount = 0
 selltradednity = []
-buytradednifty = []
+buytradedBANKNIFTY = []
 orderedprice = 0
 targettobuy = ''
 targettosell = ''
@@ -82,8 +82,8 @@ def fetchdataandreturn_pivot():
 
     tv = TvDatafeed(username, password)
     # index
-    nifty_index_data = tv.get_hist(symbol='NIFTY', exchange='NSE', interval=Interval.in_daily, n_bars=3)
-    data = nifty_index_data
+    BANKNIFTY_index_data = tv.get_hist(symbol='BANKNIFTY', exchange='NSE', interval=Interval.in_daily, n_bars=3)
+    data = BANKNIFTY_index_data
     # print(data['high'].values[-2], data['low'].values[-2], data['close'].values[-2])
     high_price = data['high'].values[-2]
     low_price = data['low'].values[-2]
@@ -212,8 +212,8 @@ def getTokenInfo(exch_seg, instrumenttype, symbol, strike_price, pe_ce, expiry_d
     if exch_seg == 'NSE':
         # print('nse')
         eq_df = df[(df['exch_seg'] == 'NSE')]
-        # print(eq_df[(eq_df['name'] == 'NIFTY')],'---####---')
-        return eq_df[(eq_df['name'] == 'NIFTY')]
+        # print(eq_df[(eq_df['name'] == 'BANKNIFTY')],'---####---')
+        return eq_df[(eq_df['name'] == 'BANKNIFTY')]
     elif exch_seg == 'NFO' and (instrumenttype == 'OPTSTK' or instrumenttype == 'OPTIDX'):
         print('nfo')
         return df[(df['exch_seg'] == 'NFO') & (df['instrumenttype'] == instrumenttype) & (df['name'] == symbol) & (
@@ -222,17 +222,17 @@ def getTokenInfo(exch_seg, instrumenttype, symbol, strike_price, pe_ce, expiry_d
 
 
 def placeorderdetails():
-    tokeninfo = getTokenInfo('NSE', 'OPTIDX', 'NIFTY', '', '').iloc[0]['token']
+    tokeninfo = getTokenInfo('NSE', 'OPTIDX', 'BANKNIFTY', '', '').iloc[0]['token']
     print(tokeninfo, "---fghjk")
     global LTP
-    LTP = obj.ltpData('NSE', 'NIFTY', tokeninfo)['data']['ltp']
+    LTP = obj.ltpData('NSE', 'BANKNIFTY', tokeninfo)['data']['ltp']
     RTM = int(round(LTP / 100) * 100)  # to get check acurate price
     print(LTP, RTM)
     ## now check price and place order details
-    # print(getTokenInfo('NFO', 'OPTIDX', 'NIFTY', RTM, 'CE').iloc[0])
+    # print(getTokenInfo('NFO', 'OPTIDX', 'BANKNIFTY', RTM, 'CE').iloc[0])
 
-    ce_symbol_data = getTokenInfo('NFO', 'OPTIDX', 'NIFTY', RTM, 'CE').iloc[0]
-    pe_symbol_data = getTokenInfo('NFO', 'OPTIDX', 'NIFTY', RTM, 'PE').iloc[0]
+    ce_symbol_data = getTokenInfo('NFO', 'OPTIDX', 'BANKNIFTY', RTM, 'CE').iloc[0]
+    pe_symbol_data = getTokenInfo('NFO', 'OPTIDX', 'BANKNIFTY', RTM, 'PE').iloc[0]
 
     ce_symbol['token'] = ce_symbol_data['token']
     ce_symbol['symbol'] = ce_symbol_data['symbol']
@@ -250,10 +250,10 @@ def PlaceOredrExit():
 # def getorderBook():
 #     tradebook = obj.position()
 #     # print(tradebook)
-#     #if len(selltradednity) > 0 or len(buytradednifty) > 0:
+#     #if len(selltradednity) > 0 or len(buytradedBANKNIFTY) > 0:
 #     if tradebook['data'] is not None:
 #         for a in tradebook['data']:
-#             if a['symbolname'] == 'NIFTY' and a['netqty'] != '0':
+#             if a['symbolname'] == 'BANKNIFTY' and a['netqty'] != '0':
 #                 return False
 #             else:
 #                 return True
@@ -261,12 +261,11 @@ def PlaceOredrExit():
 #         return True
 
 def exitontarget(data):
-    print('exit trade start')
     totalvalue = int(float(data['totalbuyvalue']))
     stoploss = float((totalvalue / 100) * 10)
     target = float((totalvalue / 100) * 20)
     pnltype = 'profit' if int(float(data['unrealised'])) > 0 else 'loss'
-    if pnltype == 'loss' and abs(int(float(data['unrealised']))) > stoploss or pnltype == 'profit' and int(float(data['unrealised'])) > target:
+    if pnltype == 'loss' and abs(int(float(data['unrealised']))) > stoploss or pnltype == 'profit' and int(float(data['pnl'])) > target:
         if data['optiontype'] == 'PE':
             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, 0)
@@ -281,16 +280,18 @@ def exitontarget(data):
 def getorderBook():
     tradebook = obj.position()
 
-    # if len(selltradednity) > 0 or len(buytradedBANKNIFTY) > 0:
+    # if len(selltradednity) > 0 or len(buytradedBANKBANKNIFTY) > 0:
     if tradebook['data'] is not None:
-        filtered_data = [item for item in tradebook['data'] if item['symbolname'] == 'NIFTY' and item['netqty'] != '0']
+
+        filtered_data = [item for item in tradebook['data'] if item['symbolname'] == 'BANKNIFTY' and item['netqty'] != '0']
         if filtered_data:
-            last_item = filtered_data[-1]  # Accessing the last item in the filtered list
+            # print(filtered_data[-1]['tradingsymbol'])
+            last_item = filtered_data[-1] # Accessing the last item in the filtered list
             print(last_item)
 
-            if last_item and last_item['symbolname'] == 'NIFTY' and last_item['netqty'] != '0':
+            if last_item and last_item['symbolname'] == 'BANKNIFTY' and last_item['netqty'] != '0':
                 exitontarget(last_item)
-                buytradednifty.append(last_item['optiontype'])
+                buytradedBANKNIFTY.append(last_item['optiontype'])
                 orderprice['data'] = last_item['avgnetprice']
                 if (last_item['optiontype'] == 'CE'):
                     ce_symbol['token'] = last_item['symboltoken']
@@ -406,7 +407,7 @@ def place_order(token, symbol, qty, exch_seg, buy_sell, ordertype, price, orderp
     # print(orderId)
 
     if placeOREDR:
-        # orderId = obj.placeOrder(orderparams)
+        #orderId = obj.placeOrder(orderparams)
         print(
             f"{buy_sell} order Place for {symbol} at : {datetime.datetime.now()} with Order id {orderId} price {price} ordered price {orderedprice}"
         )
@@ -476,7 +477,7 @@ def strategy():
         # print(obj)
 
         tv = TvDatafeed()
-        hist_data = tv.get_hist(symbol='NIFTY', exchange='NSE', interval=Interval.in_5_minute, n_bars=50)
+        hist_data = tv.get_hist(symbol='BANKNIFTY', exchange='NSE', interval=Interval.in_5_minute, n_bars=50)
         # print(hist_data)
         if not hist_data.empty:
             df = pd.DataFrame(
@@ -511,136 +512,116 @@ def strategy():
                 r_level = defineresistancelevel(pivot_fibo_level, df.close.values[-1])
                 s_level = definesupportlevel(pivot_fibo_level, df.close.values[-1])
                 print("registance : ", r_level, "support : ", s_level)
-                print('option chain : ',getoptionchain.getparams('NIFTY',df.close.values[-1],'ce' if close_cl > sup_cl else 'pe'))
+                print('option chain : ',getoptionchain.getparams('BANKNIFTY',df.close.values[-1],'ce' if close_cl > sup_cl else 'pe'))
+
                 # print(getorderBook(),'check gerate order')
                 if not df.empty:
-                    if getorderBook():  # (check if Nifty order is not placed)
-                        selltradednity.clear()
+                    if getorderBook():  # (check if BANKNIFTY order is not placed)
                         if close_pre >= sup_pre and close_cl < sup_cl:
-                           if getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'):
-                                # GettingLtpData('nifty', close_cl, "SELL")
+                            if getoptionchain.getparams('BANKNIFTY',df.close.values[-1],'pe'):
+                                # GettingLtpData('BANKNIFTY', close_cl, "SELL")
                                 place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
                                             'MARKET', 0, df.close.values[-1])
-                                buytradednifty.append('pe')
+                                buytradedBANKNIFTY.append('pe')
 
                         elif close_pre <= sup_pre and close_cl > sup_cl:
-                           if getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'):
-                                # GettingLtpData('nifty', close_cl, "BUY")
+                            if getoptionchain.getparams('BANKNIFTY',df.close.values[-1],'ce'):
+                                # GettingLtpData('BANKNIFTY', close_cl, "BUY")
                                 place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                             'MARKET', 0, df.close.values[-1])
-                                buytradednifty.append('ce')
+                                buytradedBANKNIFTY.append('ce')
 
-                        elif  close_cl > sup_cl and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level] and df.close.values[-1] > df.ema.values[-1]:
-                           print('option chain at support: ',getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'))
-
-                           if getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'):
+                        elif close_cl > sup_cl and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level] and df.close.values[-1] > df.ema.values[-1] and df.close.values[-1] > df.open.values[-1]:
+                           if getoptionchain.getparams('BANKNIFTY',df.close.values[-1],'ce'):
                                 place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0, df.close.values[-1])
-                                buytradednifty.append('ce')
+                                buytradedBANKNIFTY.append('ce')
 
-                        elif close_cl < sup_cl and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level] and df.close.values[-1] < df.ema.values[-1]:
-                            print('option chain at resistance: ',getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'))
-
-                            if getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'):
+                        elif close_cl < sup_cl and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level] and df.close.values[-1] < df.ema.values[-1] and df.close.values[-1] < df.open.values[-1]:
+                            if getoptionchain.getparams('BANKNIFTY',df.close.values[-1],'pe'):
                                  place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
                                             'MARKET', 0, df.close.values[-1])
-                                 buytradednifty.append('pe')
-
-                        # elif getoptionchain.placeorderwhenconfermation('NIFTY',df.close.values[-1],'') == 'ce':
-                        #         print('option chain send ce order')
-                        #         place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
-                        #                 'MARKET', 0, df.close.values[-1])
-                        #         buytradednifty.append('ce')
-
-                        # elif getoptionchain.placeorderwhenconfermation('NIFTY',df.close.values[-1],'') == 'pe':
-                        #         print('option chain sends pe order')
-                        #         place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
-                        #                     'MARKET', 0, df.close.values[-1])
-                        #         buytradednifty.append('pe')
+                                 buytradedBANKNIFTY.append('pe')
 
                         else:
                             print('Buy not match')
 
-                    else:  # (if Nifty order is placed, then run exit script with supertrend)
+                    else:  # (if BANKNIFTY order is placed, then run exit script with supertrend)
                         print('sell order here -----', orderedprice)
 
-                        if ('ce' in buytradednifty) and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
+                        if close_cl > sup_cl and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
                             print('exit --- 1')
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            selltradednity.append('BANKNIFTY')
 
-
-                        elif ('pe' in buytradednifty) and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
+                        elif close_cl < sup_cl and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
                             print('exit --- 2')
 
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            selltradednity.append('BANKNIFTY')
 
-
-                        elif close_cl > sup_cl and ('pe' in buytradednifty):
+                        elif close_cl > sup_cl and ('pe' in buytradedBANKNIFTY):
                             print('exit --- 1.1')
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            selltradednity.append('BANKNIFTY')
+                            buytradedBANKNIFTY.clear()
 
-                        elif close_cl < sup_cl and ('ce' in buytradednifty):
+                        elif close_cl < sup_cl and ('ce' in buytradedBANKNIFTY):
                             print('exit --- 2.1')
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            selltradednity.append('BANKNIFTY')
+                            buytradedBANKNIFTY.clear()
 
-                        elif df.close.values[-1] < df.ema.values[-1] and ('ce' in buytradednifty):
+                        elif df.close.values[-1] < df.ema.values[-1] and ('CE' in buytradedBANKNIFTY):
                             print('exit --- 3')
 
                             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            selltradednity.append('BANKNIFTY')
+                            buytradedBANKNIFTY.clear()
 
-                        elif df.close.values[-1] > df.ema.values[-1] and ('pe' in buytradednifty):
+                        elif df.close.values[-1] > df.ema.values[-1] and ('PE' in buytradedBANKNIFTY):
                             print('exit --- 4')
 
                             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                                         'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            selltradednity.append('BANKNIFTY')
+                            buytradedBANKNIFTY.clear()
 
-                        # elif df.close.values[-1] <= (int(orderprice['data']) - 10) and ('CE' in buytradednifty):
+                        # elif df.close.values[-1] <= (int(orderprice['data']) - 10) and ('CE' in buytradedBANKNIFTY):
                         #     print('exit --- 5')
                         #
                         #     place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                         #                 'MARKET', 0, df.close.values[-1])
-                        #     selltradednity.append('nifty')
-                        #     buytradednifty.clear()
+                        #     selltradednity.append('BANKNIFTY')
+                        #     buytradedBANKNIFTY.clear()
                         #
                         # elif df.close.values[-1] >= (int(orderprice['data']) + 20) and df.close.value[-2] > \
-                        #         df.close.value[-1] and ('CE' in buytradednifty):
+                        #         df.close.value[-1] and ('CE' in buytradedBANKNIFTY):
                         #     print('exit --- 5.1')
                         #
                         #     place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
                         #                 'MARKET', 0, df.close.values[-1])
-                        #     selltradednity.append('nifty')
-                        #     buytradednifty.clear()
+                        #     selltradednity.append('BANKNIFTY')
+                        #     buytradedBANKNIFTY.clear()
                         #
                         #
-                        # elif df.close.values[-1] >= (int(orderprice['data']) - 10) and ('PE' in buytradednifty):
+                        # elif df.close.values[-1] >= (int(orderprice['data']) - 10) and ('PE' in buytradedBANKNIFTY):
                         #     print('exit --- 6')
                         #
                         #     place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
                         #                 'MARKET', 0, df.close.values[-1])
-                        #     selltradednity.append('nifty')
-                        #     buytradednifty.clear()
+                        #     selltradednity.append('BANKNIFTY')
+                        #     buytradedBANKNIFTY.clear()
 
 
 
                         else:
-                            print('Exit not match')
+                            print('not match')
                 else:
                     print('df empty')
             time.sleep(1)

@@ -14,6 +14,7 @@ import math
 import requests
 import crete_update_table
 import document
+import stock_token_list
 
 current_date_time = datetime.datetime.now()
 form_date = current_date_time - timedelta(days = 10)
@@ -31,16 +32,14 @@ tradtestocks = {
     'CESC':'628'
 }
 script_list = {
-
-    'RALLIS-EQ' : "2816",
+    'RELIANCE-EQ': '2885',
     'TCS-EQ': '11536',
-    "AMBUJACEM-EQ": "1270",
-    "ADANIPORTS-EQ": "15083",
-    # "ADANIENT-EQ": "25",
-    # "AWL-EQ":"8110",
-    # 'RALLIS-EQ':"2816",
-    # 'CESC':'628'
+    'ICICIBANK-EQ': '4963',
+    'HDFCBANK-EQ': '1333',
+    'SBIN-EQ': '3045',
 };
+
+store_order_data = []
 
 buy_traded_stock = []
 sell_traded_stock = []
@@ -55,6 +54,7 @@ runcount = 0
 
 
 def fetchdataandreturn_pivot(symbol):
+    print(symbol)
     username = 'YourTradingViewUsername'
     password = 'YourTradingViewPassword'
 
@@ -106,19 +106,51 @@ def setAlreadyBuySellRecord(data):
     else:
         print('data is null')
 
+
+def storeorderdata(alldata):
+    totalprice = ((int(float(alldata.avgnetprice)) / 100) * 20) * int(alldata.netqty)
+    stoploss = float((totalprice / 100) * 2)
+    tergetorder = float((totalprice / 100) * 5)
+    pnltype = 'profit' if int(float(alldata.pnl)) > 0 else 'loss'
+    # if  netqty is greater than 0  its means that buy order placed. so, we have placed sell order if buy exit and wisevewrsa.
+    buysell = "SELL" if int(alldata.netqty) > 0 else "BUY"
+    data = {
+        'symbol': alldata.symbolname,
+        'qty': alldata.netqty,
+        'totalprice': totalprice,
+        'stoploss': stoploss,
+        'targetorder': tergetorder,
+        'pnl': alldata.pnl,
+        'pnltype': pnltype,
+        "transactiontype": buysell
+    }
+    store_order_data.append(data)
+
+
 def getorderBook(symbol,orderbook):
     tradebook = orderbook
     isscript = crete_update_table.get_data(symbol)
+    global store_order_data
+    store_order_data = []
     #optenPosition = crete_update_table.orderbook()
     #isscript = len(optenPosition) == 0 if True else any(item['script'] != symbol for item in optenPosition)
     print(len(isscript),symbol,crete_update_table.get_data(symbol),' is script' )
     if tradebook['data'] is not None:
         for a in tradebook['data']:
+            storeorderdata(a)
+            if a['instrumenttype'] != 'OPTIDX' and a['tradingsymbol'] not in script_list and a['tradingsymbol'] in stock_token_list.scripts:
+                    #print('data------true',a['tradingsymbol'],stock_token_list.scripts[a['tradingsymbol']])
+                    appendkey = str(a['tradingsymbol'])
+                    script_list[appendkey] = stock_token_list.scripts[a['tradingsymbol']]
+            elif a['tradingsymbol'] in script_list and int(a['netqty']) == 0:
+                del script_list[a['tradingsymbol']]
+            else:
+                print('script not available : ',a['tradingsymbol'])
             # print('quantity : ',a['netqty'], 'script : ',a['tradingsymbol'],int(a['netqty']) <= 0)
             if a['netqty'] != '0' and len(isscript) == 0 and a['tradingsymbol'] == symbol:
                 ordertype = a['netqty']
                 crete_update_table.insertscript(a['tradingsymbol'],ordertype)
-            elif int(a['netqty']) <= 0 and a['tradingsymbol'] == symbol:
+            elif int(a['netqty']) == 0 and a['tradingsymbol'] == symbol:
                 print('delete run')
                 crete_update_table.deletescript(a['tradingsymbol'])
 
@@ -299,7 +331,7 @@ def strategy():
         refreshToken = token['data']['refreshToken']
         feedToken = token['data']['feedToken']
         orderbook = obj.position()
-        print(token)
+        print(token,script_list)
         for script, token in script_list.items():
             historicParam = {
                 "exchange": exchange,
@@ -344,7 +376,7 @@ def strategy():
                     sup_pre3 = df.sup.values[-3]
                     close_pre3 = df.close.values[-3]
 
-                    words = script.rstrip('-EQ')
+                    words = script[:-3] if script.endswith("-EQ") else script
                     fetchdataandreturn_pivot(words)
 
                     r_level = defineresistancelevel(pivot_fibo_level,df.close.values[-1])
@@ -356,9 +388,14 @@ def strategy():
                     isscript = crete_update_table.get_data(script)
                     print(len(isscript),'script length')
                     condition_buy = len(isscript) == 0
+
                     condition_exit_sell = any(item['script'] == script and int(item['ordertype']) < 0 for item in optenPosition)
                     condition_exit_buy = any(item['script'] == script and int(item['ordertype']) > 0 for item in optenPosition)
 
+                    setExitCondition = [item for item in store_order_data if item['symbolname'] == script]
+
+
+                    print('tradeBook for script',setExitCondition)
                     print('condition_buy',condition_buy,'condition_exit_buy',condition_exit_buy,'condition_exit_sell',condition_exit_sell)
 
 
@@ -436,6 +473,12 @@ def strategy():
                              print('exit 4')
                              GettingLtpData(script, token, "BUY",'0',squaroff)
 
+                        # set terget and stoploss to exit
+
+                        elif setExitCondition and setExitCondition['pnltype'] == 'loss' and abs(int(setExitCondition['pnl'])) > int(setExitCondition['stoploss']) or setExitCondition and setExitCondition['pnltype'] == 'profit' and int(setExitCondition['pnl']) > int(setExitCondition['target']):
+                            print('Hit stoploss or target')
+                            transtype = setExitCondition['transactiontype']
+                            GettingLtpData(script, token, transtype,'0',squaroff)
 
                         else:
                             print(script,'not match')
