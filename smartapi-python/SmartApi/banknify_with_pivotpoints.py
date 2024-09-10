@@ -338,8 +338,8 @@ def place_order(token, symbol, qty, exch_seg, buy_sell, ordertype, price,orderpr
         # print(orderId)
 
         if placeOREDR:
-            #orderId = obj.placeOrder(orderparams)
-            orderId = 0
+            orderId = obj.placeOrder(orderparams)
+            #orderId = 0
             print(
                     f"{buy_sell} order Place for {symbol} at : {datetime.datetime.now()} with Order id {orderId} price {price} ordered price {orderedprice}"
                 )

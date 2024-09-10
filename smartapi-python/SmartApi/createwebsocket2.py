@@ -20,7 +20,7 @@ correlation_id = "dft_test1"
 action = 1
 mode = 1
 
-token_list = [{"exchangeType": 1, "tokens": ["26009"]}]
+token_list = [{"exchangeType": 1, "tokens": ["26000"]}]
 
 sws = SmartWebSocketV2(AUTH_TOKEN, API_KEY, CLIENT_CODE, FEED_TOKEN)
 

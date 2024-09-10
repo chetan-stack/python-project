@@ -1,5 +1,6 @@
 from SmartApi import SmartConnect  # or from SmartApi.smartConnect import SmartConnect
 import time
+import talib as talib
 from datetime import datetime, timedelta
 import datetime
 import pandas_ta as ta
@@ -17,6 +18,9 @@ from tvDatafeed import TvDatafeed, Interval
 import crete_update_table
 import json
 import getoptionchain
+import get_strick_price_historicaldata
+from tabulate import tabulate
+
 
 
 api_key = document.api_key
@@ -160,6 +164,7 @@ def orderplacewithpivot(df, param):
         print("nothing")
 
 
+
 # def orderplacewithpivot(df,param):
 #     print(pivot_fibo_level)
 #     Method_pe = 'ce' if param == 'buy' else 'pe'
@@ -223,7 +228,7 @@ def getTokenInfo(exch_seg, instrumenttype, symbol, strike_price, pe_ce, expiry_d
 
 def placeorderdetails():
     tokeninfo = getTokenInfo('NSE', 'OPTIDX', 'NIFTY', '', '').iloc[0]['token']
-    print(tokeninfo, "---fghjk")
+    print(tokeninfo, "---token")
     global LTP
     LTP = obj.ltpData('NSE', 'NIFTY', tokeninfo)['data']['ltp']
     RTM = int(round(LTP / 100) * 100)  # to get check acurate price
@@ -241,7 +246,7 @@ def placeorderdetails():
     pe_symbol['token'] = pe_symbol_data['token']
     pe_symbol['symbol'] = pe_symbol_data['symbol']
     pe_symbol['lotsize'] = pe_symbol_data['lotsize']
-
+    print(ce_symbol_data,pe_symbol_data)
 
 def PlaceOredrExit():
     placeOREDR = False
@@ -260,23 +265,46 @@ def PlaceOredrExit():
 #     else:
 #         return True
 
+global target
+global tralloss
+
+target = 0
+tralloss = 0
+
 def exitontarget(data):
-    print('exit trade start')
+    global target, tralloss
+
     totalvalue = int(float(data['totalbuyvalue']))
-    stoploss = float((totalvalue / 100) * 10)
-    target = float((totalvalue / 100) * 20)
+    stoploss = float((totalvalue / 100) * 5)
+
+    # Initialize target if it's the first time
+    target = (totalvalue / 100) * 15 if target == 0 else target
+
     pnltype = 'profit' if int(float(data['unrealised'])) > 0 else 'loss'
-    if pnltype == 'loss' and abs(int(float(data['unrealised']))) > stoploss or pnltype == 'profit' and int(float(data['unrealised'])) > target:
+    print(target,stoploss,data['pnl'],pnltype,abs(int(float(data['unrealised']))))
+    if pnltype == 'profit' and abs(int(float(data['unrealised']))) > target:
+        tralloss = (abs(int(float(data['unrealised']))) - float((totalvalue / 100) * 2))
+        target = (abs(int(float(data['unrealised']))) + float((totalvalue / 100) * 5))
+        print('target', target, 'tral', tralloss, 'pnl', data['pnl'], 'change', (totalvalue / 100) * 5)
+    elif pnltype == 'profit' and tralloss != 0 and abs(int(float(data['unrealised']))) < tralloss:
         if data['optiontype'] == 'PE':
             place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
-                                        'MARKET', 0, 0)
+                        'MARKET', 0, 0)
         elif data['optiontype'] == 'CE':
             place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
-                                        'MARKET', 0, 0)
+                        'MARKET', 0, 0)
+    elif pnltype == 'loss' and abs(int(float(data['unrealised']))) > stoploss:
+        if data['optiontype'] == 'PE':
+            place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
+                        'MARKET', 0, 0)
+        elif data['optiontype'] == 'CE':
+            place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
+                        'MARKET', 0, 0)
         else:
             print('No stoploss or target hit')
     else:
         print('No Exit Targrt target hit for 1/3','pnl:',int(float(data['pnl'])),'type:',pnltype,'totalorder:',totalvalue,'stoploss:',stoploss,'target:',target)
+
 
 def getorderBook():
     tradebook = obj.position()
@@ -397,12 +425,12 @@ def place_order(token, symbol, qty, exch_seg, buy_sell, ordertype, price, orderp
         "duration": "DAY",
         "squareoff": "0",
         "stoploss": "0",
-        "quantity": qty,
+        "quantity": 1,
         'price': price
     }
 
-    #orderId = 1
-    orderId = obj.placeOrder(orderparams)
+    orderId = 1
+    #orderId = obj.placeOrder(orderparams)
     # print(orderId)
 
     if placeOREDR:
@@ -454,6 +482,34 @@ def exitQuert():
 
 # def getoption():
 
+def checkcandlestickpattern(df):
+    #print('last item of data',df)
+    pattern_columns = {
+        'CDL_HAMMER': 'Bullish',
+        'CDL_BULLISH_ENGULFING': 'Bullish',
+        'CDL_PIERCING': 'Bullish',
+        'CDL_MORNING_STAR': 'Bullish',
+        'CDL_THREE_WHITE_SOLDIERS': 'Bullish',
+        'CDL_HANGING_MAN': 'Bearish',
+        'CDL_SHOOTING_STAR': 'Bearish',
+        'CDL_BEARISH_ENGULFING': 'Bearish',
+        'CDL_EVENING_STAR': 'Bearish',
+        'CDL_THREE_BLACK_CROWS': 'Bearish',
+        'CDL_DARK_CLOUD_COVER': 'Bearish',
+        'CDL_DOJI': 'Neutral',
+        'CDL_SPINNING_TOP': 'Neutral'
+    }
+    pattern_columns_list = list(pattern_columns.keys())
+    signals = []
+    for col in pattern_columns_list:
+        if df[col] == 100 or df[col] == -100:
+            result = {'signal':pattern_columns[col],'pattern_name':col}
+            signals.append(result)
+
+    bot_message = f'5 min signals for Nifty {signals} and the time is {datetime.datetime.now()}'
+    if len(signals) > 0:
+        sendAlert(bot_message)
+
 
 def strategy():
     print('check stetergy')
@@ -476,7 +532,7 @@ def strategy():
         # print(obj)
 
         tv = TvDatafeed()
-        hist_data = tv.get_hist(symbol='NIFTY', exchange='NSE', interval=Interval.in_5_minute, n_bars=50)
+        hist_data = tv.get_hist(symbol='NIFTY', exchange='NSE', interval=Interval.in_5_minute, n_bars=100)
         # print(hist_data)
         if not hist_data.empty:
             df = pd.DataFrame(
@@ -484,11 +540,48 @@ def strategy():
                 columns=['date', 'open', 'high', 'low', 'close', 'volume'])
 
             df["sup"] = ta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=2)['SUPERT_10_2.0']
-            df["ema"] = ta.ema(df["close"], length=10)
+            df["ema"] = ta.ema(df["close"], length=9)
             df['stx'] = np.where((df['sup'] > 0.00), np.where((df['close'] > df['sup']), 'up', 'down'), np.NaN)
             df['Candle_Color'] = 1  # Initialize with a value indicating green candles
             df.loc[df['close'] < df['open'], 'Candle_Color'] = 0
 
+            # Calculate candlestick patterns using pandas_ta
+            df['CDL_HAMMER'] = talib.CDLHAMMER(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_BULLISH_ENGULFING'] = talib.CDLENGULFING(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_PIERCING'] = talib.CDLPIERCING(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_MORNING_STAR'] = talib.CDLMORNINGSTAR(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_THREE_WHITE_SOLDIERS'] = talib.CDL3WHITESOLDIERS(df['open'], df['high'], df['low'], df['close'])
+
+            df['CDL_HANGING_MAN'] = talib.CDLHANGINGMAN(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_SHOOTING_STAR'] = talib.CDLSHOOTINGSTAR(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_BEARISH_ENGULFING'] = talib.CDLENGULFING(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_EVENING_STAR'] = talib.CDLEVENINGSTAR(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_THREE_BLACK_CROWS'] = talib.CDL3BLACKCROWS(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_DARK_CLOUD_COVER'] = talib.CDLDARKCLOUDCOVER(df['open'], df['high'], df['low'], df['close'])
+
+            df['CDL_DOJI'] = talib.CDLDOJI(df['open'], df['high'], df['low'], df['close'])
+            df['CDL_SPINNING_TOP'] = talib.CDLSPINNINGTOP(df['open'], df['high'], df['low'], df['close'])
+            # df['CDL_FALLING_THREE_METHODS'] = talib.CDLFALLING3METHODS(df['open'], df['high'], df['low'], df['close'])
+            # df['CDL_RISING_THREE_METHODS'] = talib.CDLRISING3METHODS(df['open'], df['high'], df['low'], df['close'])
+            pattern_columns = [
+            'CDL_HAMMER', 'CDL_BULLISH_ENGULFING', 'CDL_PIERCING', 'CDL_MORNING_STAR', 'CDL_THREE_WHITE_SOLDIERS',
+            'CDL_HANGING_MAN', 'CDL_SHOOTING_STAR', 'CDL_BEARISH_ENGULFING', 'CDL_EVENING_STAR', 'CDL_THREE_BLACK_CROWS',
+            'CDL_DARK_CLOUD_COVER', 'CDL_DOJI', 'CDL_SPINNING_TOP'
+            ]
+            filtered_df = df[df[pattern_columns].isin([100, -100]).any(axis=1)]
+
+            # Select only date and pattern columns
+            filtered_df = filtered_df[['date','CDL_HAMMER', 'CDL_BULLISH_ENGULFING', 'CDL_PIERCING', 'CDL_MORNING_STAR', 'CDL_THREE_WHITE_SOLDIERS',
+                'CDL_HANGING_MAN', 'CDL_SHOOTING_STAR', 'CDL_BEARISH_ENGULFING', 'CDL_EVENING_STAR', 'CDL_THREE_BLACK_CROWS',
+                'CDL_DARK_CLOUD_COVER', 'CDL_DOJI', 'CDL_SPINNING_TOP']]
+            filtered_df.reset_index(inplace=True)
+
+            # Display the filtered dataframe in a table format with only date and pattern columns
+            #print(tabulate(filtered_df, headers='keys', tablefmt='psql'))
+
+            # print(tabulate(df, headers='keys', tablefmt='psql'))
+
+            # print(df.tail())
             if not df.empty:
                 print('#------------------------------', df.close.values[-5], df.close.values[-4], df.close.values[-3],
                       df.close.values[-2], "----", df.sup.values[-1], '-----------------------#',
@@ -510,38 +603,50 @@ def strategy():
 
                 r_level = defineresistancelevel(pivot_fibo_level, df.close.values[-1])
                 s_level = definesupportlevel(pivot_fibo_level, df.close.values[-1])
+                print(df)
+                #print('last item of object',df.iloc[-1])
                 print("registance : ", r_level, "support : ", s_level)
                 print('option chain : ',getoptionchain.getparams('NIFTY',df.close.values[-1],'ce' if close_cl > sup_cl else 'pe'))
+                print('strick price ce',ce_symbol['symbol'],ce_symbol['token'],get_strick_price_historicaldata.gethistoricalldata(ce_symbol['symbol'],ce_symbol['token']))
+                print('strick price pe',pe_symbol['symbol'],pe_symbol['token'],get_strick_price_historicaldata.gethistoricalldata(pe_symbol['symbol'],pe_symbol['token']))
+                #checkcandlestickpattern(df.iloc[-2])
+                #stetergytosendalert(df)
+
                 # print(getorderBook(),'check gerate order')
                 if not df.empty:
                     if getorderBook():  # (check if Nifty order is not placed)
                         selltradednity.clear()
-                        if close_pre >= sup_pre and close_cl < sup_cl:
+                        if close_pre > sup_pre and close_cl < sup_cl:
                            if getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'):
+                                print('buy 1')
                                 # GettingLtpData('nifty', close_cl, "SELL")
                                 place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
                                             'MARKET', 0, df.close.values[-1])
                                 buytradednifty.append('pe')
 
-                        elif close_pre <= sup_pre and close_cl > sup_cl:
+                        elif close_pre < sup_pre and close_cl > sup_cl:
                            if getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'):
+                                print('buy 2')
                                 # GettingLtpData('nifty', close_cl, "BUY")
                                 place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                             'MARKET', 0, df.close.values[-1])
                                 buytradednifty.append('ce')
 
-                        elif  close_cl > sup_cl and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level] and df.close.values[-1] > df.ema.values[-1]:
+                        elif df.low.values[-2] < pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level] and df.close.values[-1] > df.ema.values[-1]:
                            print('option chain at support: ',getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'))
-
+                           print(df.low.values[-2] , df.low.values[-1] , pivot_fibo_level[s_level])
                            if getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'):
+                                print('buy 3')
                                 place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'BUY',
                                         'MARKET', 0, df.close.values[-1])
                                 buytradednifty.append('ce')
 
-                        elif close_cl < sup_cl and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level] and df.close.values[-1] < df.ema.values[-1]:
+                        elif df.high.values[-2] > pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level] and df.close.values[-1] < df.ema.values[-1]:
                             print('option chain at resistance: ',getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'))
+                            print(df.low.values[-2] , df.low.values[-1] , pivot_fibo_level[r_level])
 
                             if getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'):
+                                 print('buy 4')
                                  place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'BUY',
                                             'MARKET', 0, df.close.values[-1])
                                  buytradednifty.append('pe')
@@ -566,19 +671,20 @@ def strategy():
 
                         if ('ce' in buytradednifty) and df.high.values[-2] >= pivot_fibo_level[r_level] and df.close.values[-1] < pivot_fibo_level[r_level]:
                             print('exit --- 1')
-                            place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
-                                        'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            if getoptionchain.getparams('NIFTY',df.close.values[-1],'pe'):
+                                place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
+                                            'MARKET', 0, df.close.values[-1])
+                                selltradednity.append('nifty')
+                                buytradednifty.clear()
 
 
                         elif ('pe' in buytradednifty) and df.low.values[-2] <= pivot_fibo_level[s_level] and df.close.values[-1] > pivot_fibo_level[s_level]:
                             print('exit --- 2')
-
-                            place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
-                                        'MARKET', 0, df.close.values[-1])
-                            selltradednity.append('nifty')
-                            buytradednifty.clear()
+                            if getoptionchain.getparams('NIFTY',df.close.values[-1],'ce'):
+                                place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
+                                            'MARKET', 0, df.close.values[-1])
+                                selltradednity.append('nifty')
+                                buytradednifty.clear()
 
 
                         elif close_cl > sup_cl and ('pe' in buytradednifty):
@@ -611,6 +717,22 @@ def strategy():
                             selltradednity.append('nifty')
                             buytradednifty.clear()
 
+                        elif ('pe' in buytradednifty) and get_strick_price_historicaldata.checkexitconditio(pe_symbol['symbol'],pe_symbol['token']):
+                            print('exit --- 5 with check strick price condition')
+
+                            place_order(pe_symbol['token'], pe_symbol['symbol'], pe_symbol['lotsize'], 'NFO', 'SELL',
+                                        'MARKET', 0, df.close.values[-1])
+                            selltradednity.append('nifty')
+                            buytradednifty.clear()
+
+                        elif ('ce' in buytradednifty) and get_strick_price_historicaldata.checkexitconditio(ce_symbol['symbol'],ce_symbol['token']):
+                            print('exit --- 6 with check strick price condition')
+
+                            place_order(ce_symbol['token'], ce_symbol['symbol'], ce_symbol['lotsize'], 'NFO', 'SELL',
+                                        'MARKET', 0, df.close.values[-1])
+                            selltradednity.append('nifty')
+                            buytradednifty.clear()
+
                         # elif df.close.values[-1] <= (int(orderprice['data']) - 10) and ('CE' in buytradednifty):
                         #     print('exit --- 5')
                         #
@@ -637,8 +759,6 @@ def strategy():
                         #     selltradednity.append('nifty')
                         #     buytradednifty.clear()
 
-
-
                         else:
                             print('Exit not match')
                 else:
@@ -663,6 +783,227 @@ def strategy():
     #     bot_message = f"Logout failed {e}"
     #     # sendAlert(bot_message)
 
+def stetergytosendalert(data):
+       df_1min = aggregate_data(data, '1T').tail(100)
+       df_5min = aggregate_data(data, '5T').tail(100)
+       df_15min = aggregate_data(data, '15T').tail(100)
+       df_30min = aggregate_data(data, '30T').tail(10)
+
+       itemlow = data.low.values[-1]
+       itemhigh = data.high.values[-1]
+
+       preitemlow = data.low.values[-2]
+       preitemhigh = data.high.values[-2]
+
+       itemclose = data.close.values[-1]
+       symbol = 'NIFTY'
+       getdata = crete_update_table.fetchsupport()
+       supportprice1min = [a for a in getdata if a['timeframe'] == '1m']
+       supportprice5min = [a for a in getdata if a['timeframe'] == '5m']
+       supportprice15min = [a for a in getdata if a['timeframe'] == '15m']
+       supportprice30min = [a for a in getdata if a['timeframe'] == '30m']
+       #print('set data',supportprice1min[0]['supportlist'],supportprice1min,supportprice5min,)
+       if len(supportprice1min[0]['supportlist']) > 0:
+           #print('check ----',supportprice1min[0]['supportlist'])
+           supportlist = [float(a) for a in supportprice1min[0]['supportlist']]
+           for a in supportlist:
+              #print(a,'print a data',previtemclose)
+              if a > df_1min.low.values[-2] and a < df_1min.close.values[-1]:
+                              bot_message = f'braekout  in 1min timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                              sendAlert(bot_message)
+              elif a < df_1min.high.values[-2] and a > df_1min.close.values[-1]:
+                              bot_message = f'braekout  in 1min timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                              sendAlert(bot_message)
+           else:
+                  print('no 1 min support')
+       else:
+                    print('no 1min timeframe shows target')
+
+       if len(supportprice5min[0]['supportlist']) > 0:
+           supportlist5min = [float(a) for a in supportprice5min[0]['supportlist']]
+           for a in supportlist5min:
+              #print(a,'print a data',previtemclose)
+              if a > df_5min.low.values[-2] and a < df_5min.close.values[-1]:
+                  bot_message = f'braekout  in 5 min timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                  sendAlert(bot_message)
+              elif a < df_5min.high.values[-2] and a > df_5min.close.values[-1]:
+                  bot_message = f'braekout  in 5 min timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                  sendAlert(bot_message)
+           else:
+               print('no 5min support hit')
+       else:
+                    print('no 5min timeframe shows target')
+
+       if len(supportprice15min[0]['supportlist']) > 0:
+           supportlist15min = [float(a) for a in supportprice15min[0]['supportlist']]
+           for a in supportlist15min:
+              #print(a,'print a data',previtemclose)
+              if a > df_15min.low.values[-2] and a < df_15min.close.values[-1]:
+                  bot_message = f'braekout  in 15 min timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                  sendAlert(bot_message)
+              elif a < df_15min.high.values[-2] and a > df_15min.close.values[-1]:
+                  bot_message = f'braekout  in 15 min timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                  sendAlert(bot_message)
+
+           else:
+                  print('no 15 min support hit')
+       else:
+                    print('no 15min timeframe shows target')
+
+       if len(supportprice30min[0]['supportlist']) > 0:
+           supportlist30min = [float(a) for a in supportprice30min[0]['supportlist']]
+           for a in supportlist30min:
+               # print(a,'print a data',previtemclose)
+               if a > df_30min.low.values[-2] and a < df_30min.close.values[-1]:
+                   bot_message = f'braekout  in 30 min timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                   sendAlert(bot_message)
+               elif a < df_30min.high.values[-2] and a > df_30min.close.values[-1]:
+                   bot_message = f'braekout  in 30 min timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                   sendAlert(bot_message)
+           else:
+                   print("no 30 min support hit")
+       else:
+                        print('no 30 min support hit')
+
+
+
+def stetergycheck1min(symbol):
+    try:
+        username = 'YourTradingViewUsername'
+        password = 'YourTradingViewPassword'
+
+        tv = TvDatafeed(username, password)
+        data = tv.get_hist(symbol='NIFTY', exchange='NSE', interval=Interval.in_1_minute, n_bars=2000)
+        #print(data)
+        if data is not None:
+            df = pd.DataFrame(
+                data,
+                columns=['date', 'open', 'high', 'low', 'close', 'volume'])
+            df["timestamp"] = pd.date_range(pd.Timestamp.now(), periods=len(df), freq='T')
+
+            # Aggregate to 5-minute, 15-minute, and 30-minute time frames
+            df_1min = aggregate_data(df, '1T').tail(100)
+            df_5min = aggregate_data(df, '5T').tail(100)
+            df_15min = aggregate_data(df, '15T').tail(300)
+            stetergytosendalert(df)
+
+        else:
+            print('df is none')
+    except Exception as e:
+        print('error',e)
+
+
+# Function to aggregate data to different time frames
+def aggregate_data(df, time_frame):
+    resampled_df = df.resample(time_frame).agg({
+        'open': 'first',
+        'high': 'max',
+        'low': 'min',
+        'close': 'last'
+    })
+    return resampled_df
+
+def stetergycheck5min(symbol):
+    try:
+        username = 'YourTradingViewUsername'
+        password = 'YourTradingViewPassword'
+
+        tv = TvDatafeed(username, password)
+        df = tv.get_hist(symbol=symbol, exchange='NSE', interval=Interval.in_5_minute, n_bars=100)
+        if df is not None:
+            resistancelevel = []
+            supportlevel = []
+            itemclose = df.close.values[-1]
+            previtemclose = df.close.values[-2]
+
+            supports = df[df.low == df.low.rolling(10, center=True).min()].low
+            resistances = df[df.high == df.high.rolling(10, center=True).max()].high
+
+            level = pd.concat([supports, resistances])
+            level = level[abs(level.diff()) > 10]
+
+            #return df, level, registance_item, support_item
+            if level is not None:
+                for a in level:
+                    if a > itemclose and a < previtemclose:
+                          bot_message = f'braekout  in 1mi timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                          sendAlert(bot_message)
+                    elif a < itemclose and a > previtemclose:
+                          bot_message = f'braekout  in 1mi timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                          sendAlert(bot_message)
+            else:
+                print('no 5min timeframe shows target')
+
+        else:
+            print('5min i df is blank')
+    except Exception as e:
+        print('error',e)
+
+def stetergycheck15min(symbol):
+    try:
+        username = 'YourTradingViewUsername'
+        password = 'YourTradingViewPassword'
+
+        tv = TvDatafeed(username, password)
+        df = tv.get_hist(symbol=symbol, exchange='NSE', interval=Interval.in_15_minute, n_bars=100)
+
+        resistancelevel = []
+        supportlevel = []
+        itemclose = df.close.values[-1]
+        previtemclose = df.close.values[-2]
+
+        supports = df[df.low == df.low.rolling(10, center=True).min()].low
+        resistances = df[df.high == df.high.rolling(10, center=True).max()].high
+
+        level = pd.concat([supports, resistances])
+        level = level[abs(level.diff()) > 10]
+
+        #return df, level, registance_item, support_item
+        if level is not None:
+            for a in level:
+                if a > itemclose and a < previtemclose:
+                      bot_message = f'braekout  in 1mi timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                      sendAlert(bot_message)
+                elif a < itemclose and a > previtemclose:
+                      bot_message = f'braekout  in 1mi timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                      sendAlert(bot_message)
+        else:
+            print('no 15min timeframe shows target')
+    except Exception as e:
+        print('error',e)
+
+def stetergycheck30min(symbol):
+    try:
+        username = 'YourTradingViewUsername'
+        password = 'YourTradingViewPassword'
+
+        tv = TvDatafeed(username, password)
+        df = tv.get_hist(symbol=symbol, exchange='NSE', interval=Interval.in_30_minute, n_bars=100)
+
+        resistancelevel = []
+        supportlevel = []
+        itemclose = df.close.values[-1]
+        previtemclose = df.close.values[-2]
+
+        supports = df[df.low == df.low.rolling(10, center=True).min()].low
+        resistances = df[df.high == df.high.rolling(10, center=True).max()].high
+
+        level = pd.concat([supports, resistances])
+        level = level[abs(level.diff()) > 10]
+
+        #return df, level, registance_item, support_item
+        if level is not None:
+            for a in level:
+                if a > itemclose and a < previtemclose:
+                      bot_message = f'braekout  in 1mi timeframe status:SELL for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                      sendAlert(bot_message)
+                elif a < itemclose and a > previtemclose:
+                      bot_message = f'braekout  in 1mi timeframe status:BUY for {symbol} and the time is {datetime.datetime.now()} ordered price {itemclose}'
+                      sendAlert(bot_message)
+        else:
+            print('no 30min timeframe shows target')
+    except Exception as e:
+        print('error',e)
 
 # try:
 #     api_key = document.api_key
@@ -680,10 +1021,18 @@ def strategy():
 # except Exception as e:
 #     print("Build Connection Error: {}".format(e), format(datetime.datetime.now()))
 initialisedTockenMap()
-# getorderBook()
+#getorderBook()
 fetchdataandreturn_pivot()
 strategy()
+schedule.every(20).seconds.do(getorderBook)
+#schedule.every(1).minutes.do(stetergycheck1min,'NIFTY') #call every 1min to check support and registance
+# schedule.every(40).seconds.do(stetergycheck5min,'NIFTY') #call every 5min to check support and registance
+# schedule.every(50).seconds.do(stetergycheck15min,'NIFTY') #call every 15min to check support and registance
+# schedule.every(60).seconds.do(stetergycheck30min,'NIFTY') #call every 30min to check support and registance
+
 schedule.every(1).minutes.do(strategy)
+
+
 # schedule.every(5).minutes.do(checkorderlimit)
 schedule.every().day.at("15:05").do(exitQuert)
 schedule.every().day.at("15:00").do(PlaceOredrExit)
@@ -701,3 +1050,4 @@ while True:
 # obj.orderBook()
 # obj.position()
 # obj.holding()
+

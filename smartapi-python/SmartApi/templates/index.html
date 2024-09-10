@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flask WebView</title>
+
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+ <script>
+        // Function to refresh the page every 3 seconds
+        function refreshPage() {
+            setInterval(function() {
+                window.location.reload();
+            }, 3000); // 3000 milliseconds = 3 seconds
+        }
+    </script>
+</head>
+<body>
+   <h1> Traded data  - Profit : {{allprofit}}</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Script</th>
+                <th>Token</th>
+                <th>Lot Size</th>
+                <th>LPT</th>
+                <th>Buy Price</th>
+                  <th>trailing_stoploss_price</th>
+                  <th>max_price_achieved</th>
+                  <th>target_price</th>
+                <th>Profit</th>
+                <th>Profit data</th>
+                <th>Created Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in fetchdata %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.script }}</td>
+                    <td>{{ item.token }}</td>
+                    <td>{{ item.lotsize }}</td>
+                    <td>{{ item.nltp }}</td>
+                    <td>{{ item.ltp }}</td>
+                    <td>{{ item.trailing_stoploss_price }}</td>
+                    <td>{{ item.max_price_achieved }}</td>
+                    <td>{{ item.target_price }}</td>
+                    <td>{{ item.profit }}</td>
+                    <td>{{ item.profittext}}</td>
+                    <td>{{ item.createddate }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+
+<script>
+    function splitAndReturnTable(data) {
+    // Split the input data into components
+    const parts = data.split(' - ');
+
+    // Extract values
+    const ltp = parts[0].split(': ')[1];
+    const buyPrice = parts[1].split(' ')[1];
+    const profit = parts[2].split(' ')[1];
+
+    // Create HTML table
+    const table = `
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Label</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>LTP</td>
+                    <td>${ltp}</td>
+                </tr>
+                <tr>
+                    <td>Buy Price</td>
+                    <td>${buyPrice}</td>
+                </tr>
+                <tr>
+                    <td>Profit</td>
+                    <td>${profit}</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
+    return table;
+}
+</script>
+
+</html>
+
+

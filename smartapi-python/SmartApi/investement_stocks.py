@@ -90,8 +90,8 @@ def meets_strategy(stock_data):
     condition_5 = stock_data['close'].values[-1] > stock_data['SMA_50'].values[-1]
     condition_6 = stock_data['close'].values[-1] >= 1.3 * stock_data['52_week_low'].values[-1]
     condition_7 = stock_data['close'].values[-1] <= 1.25 * stock_data['52_week_high'].values[-1]
-    all_condition = condition_1 & condition_2 & condition_4 & condition_5 & condition_6 & condition_7
-    return condition_1
+    all_condition = condition_1 & condition_2 & condition_4 & condition_5
+    return all_condition
 
 
 def fetchdataandreturn_pivot(symbol):
@@ -219,7 +219,7 @@ def main():
                                     'registance':pivot_fibo_level[r_level],
                                     'target-profit':pivot_fibo_level[r_level] - stock_data.close.values[-1]
                                 }
-                                buy_traded_stock.append(alllevlels)
+                                buy_traded_stock.append(script)
                                 print(script,'done',buy_traded_stock)
                         else:
                             print(script,'not done',buy_traded_stock)
@@ -248,3 +248,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

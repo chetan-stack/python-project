@@ -115,6 +115,8 @@ f_only = {
     'WIPRO-EQ': '3787',
   };
 
+
+
 exchange = "NFO"
 traded_list = []
 traded_list_filter = []
